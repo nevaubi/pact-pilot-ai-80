@@ -23,3 +23,5 @@
 - Document text is extracted in the browser (`src/lib/extract.ts`) and stored on `files.extracted_text`; why: Worker runtime can't run pdf/docx parsers.
 - Heavy matter tools load on demand and matter tabs prefetch only their active data; why: routine navigation should not download OCR/AI/editor code or fetch unused tabs.
 - All firm data is shared to any signed-in user (RLS `to authenticated using (true)`); why: phase 1 has no roles.
+- WebAssembly binaries (e.g. pdfium) are served from `public/wasm/` and loaded by URL in client-only code, never imported from source; why: imported .wasm lands in the Worker server bundle and breaks deploys.
+- Office editors (`src/components/office/*`) share one `EditorHandle` and load lazily on `/office/$fileId`; AI text enters a document only via the attorney clicking Insert/Replace; why: one shell for Word/PDF/sheet and AI stays supportive.

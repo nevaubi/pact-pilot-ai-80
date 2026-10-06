@@ -6,7 +6,7 @@ Priority order: (a) broken → (b) core non-AI flows → (c) AI desk → (d) pol
 - [ ] Law library: authoritative Illinois + federal sources auto-fetched and stored (eCFR, Federal Register, U.S. Code, IRS/IDOR publications, Cook County / Chicago pages, ILCS official links), full-text indexed, refreshable, fetch-on-request search of public law APIs, pin sources to a matter
 - [ ] Tax red-flag checker per matter: grounded on library passages, verbatim-anchored quotes, flags only (never advice), persisted, tick-to-add tasks
 - [ ] Real estate module: property & deal terms, business-day contract dates, Illinois/Cook/Chicago transfer tax + tax proration math with citations, jurisdiction requirements checklist, title commitment & survey review (AI, grounded, cross-referenced)
-- [ ] Office: Word (.docx) editor with high-fidelity rendering and tracked suggestions, PDF viewer/annotator, spreadsheet editor; AI drafting side panel connected to the matter's files, pinned sources, house templates and the open document
+- [x] Office: Word (.docx) editor with high-fidelity rendering and tracked suggestions, PDF viewer/annotator, spreadsheet editor; AI drafting side panel connected to the matter's files, pinned sources, house templates and the open document
 - [ ] Compliance calendar generator (entity annual reports, UCC continuations) with authority links
 
 ## Ready (next pass)

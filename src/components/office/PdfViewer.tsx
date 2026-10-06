@@ -28,18 +28,20 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
   const [wasmUrl, setWasmUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const registryRef = useRef<Registry | null>(null);
+  // The viewer reads its document URL once at start-up, so the URL must outlive dev double-mounts;
+  // it is released a minute after the viewer goes away.
   const url = useMemo(() => URL.createObjectURL(blob), [blob]);
   const docId = useMemo(() => `doc-${crypto.randomUUID().slice(0, 8)}`, []);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  useEffect(() => () => void setTimeout(() => URL.revokeObjectURL(url), 60000), [url]);
 
   useEffect(() => {
     let disposed = false;
     (async () => {
       try {
-        const [{ PDFViewer }, wasm] = await Promise.all([import("@embedpdf/react-pdf-viewer"), import("@embedpdf/pdfium/pdfium.wasm?url")]);
+        const { PDFViewer } = await import("@embedpdf/react-pdf-viewer");
         if (disposed) return;
         setViewer(() => PDFViewer);
-        setWasmUrl(wasm.default);
+        setWasmUrl(`${window.location.origin}/wasm/pdfium.wasm`);
       } catch (e) {
         console.error("[office:pdf:init]", e);
         if (!disposed) setFailed(e instanceof Error ? e.message : "The PDF viewer couldn't start.");
@@ -105,7 +107,7 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
         <p className="mt-1 text-muted-foreground">{failed}</p>
       </div>
     );
-  if (!Viewer || !wasmUrl)
+  if (!Viewer || !wasmUrl || !url)
     return (
       <div className="flex h-full items-start justify-center bg-raised p-6">
         <div className="w-full max-w-3xl space-y-3 rounded border bg-card p-10 shadow-sm">
@@ -130,18 +132,19 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
             dark: { accent: { primary: "#3B82F6" } },
           },
           documentManager: { initialDocuments: [{ url, documentId: docId, name, autoActivate: true }] },
-          annotations: { author },
+          annotations: { annotationAuthor: author },
           export: { defaultFileName: name },
           disabledCategories: ["signature"],
         }}
         onReady={(registry) => {
           registryRef.current = registry as unknown as Registry;
           onReady?.();
+          const start = Date.now();
           try {
             const ann = (registry as unknown as Registry).getPlugin("annotation")?.provides() as { onAnnotationEvent?: (cb: (e: unknown) => void) => void } | undefined;
             ann?.onAnnotationEvent?.((e) => {
               const ev = e as { type?: string };
-              if (ev?.type && ev.type !== "select" && ev.type !== "deselect") onDirty();
+              if (Date.now() - start > 1500 && ev?.type && !["select", "deselect", "loaded"].includes(ev.type)) onDirty();
             });
           } catch (e) {
             console.warn("[office:pdf:events]", e);
