@@ -943,6 +943,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      save_file_version: {
+        Args: {
+          p_expected_path: string
+          p_extracted_text?: string
+          p_file_id: string
+          p_new_path: string
+          p_note?: string
+          p_size: number
+          p_update_text?: boolean
+        }
+        Returns: {
+          path: string
+          version_id: string
+        }[]
+      }
       search_authorities: {
         Args: {
           ids?: string[]
