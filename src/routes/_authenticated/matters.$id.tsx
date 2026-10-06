@@ -21,6 +21,9 @@ const FilesTab = lazy(() => import("@/components/matter/FilesTab").then((m) => (
 const ClosingTab = lazy(() => import("@/components/matter/ClosingTab").then((m) => ({ default: m.ClosingTab })));
 const DraftsTab = lazy(() => import("@/components/matter/DraftsTab").then((m) => ({ default: m.DraftsTab })));
 const AssistPanel = lazy(() => import("@/components/matter/AssistPanel").then((m) => ({ default: m.AssistPanel })));
+const TaxTab = lazy(() => import("@/components/matter/TaxTab").then((m) => ({ default: m.TaxTab })));
+const SourcesTab = lazy(() => import("@/components/matter/SourcesTab").then((m) => ({ default: m.SourcesTab })));
+const RealEstateTab = lazy(() => import("@/components/matter/RealEstateTab").then((m) => ({ default: m.RealEstateTab })));
 
 const TABS = [
   "Overview",
@@ -29,6 +32,9 @@ const TABS = [
   "Closing",
   "Files",
   "Drafts",
+  "Real Estate",
+  "Tax flags",
+  "Sources",
   "Notes",
   "Contacts",
   "Activity",
@@ -180,7 +186,7 @@ function MatterPage() {
         </div>
         <Tabs value={tab} onValueChange={setTab} className="mt-2">
           <TabsList className="h-auto w-full flex-nowrap justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] sm:flex-wrap">
-            {TABS.map((t) => (
+            {TABS.filter((t) => t !== "Real Estate" || m.practice_area === "Real Estate").map((t) => (
               <TabsTrigger
                 key={t}
                 value={t}
@@ -211,6 +217,15 @@ function MatterPage() {
           </TabsContent>
           <TabsContent value="Drafts">
             <Suspense fallback={<TabLoading />}><DraftsTab matter={m} /></Suspense>
+          </TabsContent>
+          <TabsContent value="Real Estate">
+            <Suspense fallback={<TabLoading />}><RealEstateTab matter={m} /></Suspense>
+          </TabsContent>
+          <TabsContent value="Tax flags">
+            <Suspense fallback={<TabLoading />}><TaxTab matter={m} /></Suspense>
+          </TabsContent>
+          <TabsContent value="Sources">
+            <Suspense fallback={<TabLoading />}><SourcesTab matter={m} /></Suspense>
           </TabsContent>
           <TabsContent value="Notes">
             <NotesTab matterId={id} />
