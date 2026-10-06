@@ -104,7 +104,7 @@ function AuthPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-sm rounded-2xl border bg-card p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded border bg-card p-7 shadow-sm">
         <div className="mb-6 flex items-center gap-3">
           <LogoMark className="h-10 w-10" />
           <div>

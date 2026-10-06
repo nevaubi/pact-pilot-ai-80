@@ -257,7 +257,7 @@ function NewDraft({
                 <li key={t.id}>
                   <button
                     onClick={() => setTpl(t)}
-                    className="w-full rounded-lg border bg-raised p-3 text-left transition-colors hover:border-primary"
+                    className="w-full rounded border bg-raised p-3 text-left transition-colors hover:border-primary"
                   >
                     <p className="text-sm font-medium">{t.name}</p>
                     <div className="mt-1 flex items-center gap-2">
@@ -318,7 +318,7 @@ function NewDraft({
             </div>
           </div>
           {error && (
-            <p className="mb-3 rounded-lg border border-ink-red/30 bg-ink-red/5 px-3 py-2 text-sm">
+            <p className="mb-3 rounded border border-ink-red/30 bg-ink-red/5 px-3 py-2 text-sm">
               {error}
             </p>
           )}
@@ -552,7 +552,7 @@ function DraftEditor({
         <Textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          className="min-h-[60vh] bg-raised font-serif text-[13px] leading-relaxed"
+          className="min-h-[60vh] bg-raised font-mono text-[12px] leading-relaxed"
           aria-label="Draft text"
         />
       </Panel>

@@ -206,7 +206,7 @@ export function MeetingNotesDialog({
               aria-label="Rough notes"
             />
             {error && (
-              <p className="rounded-lg border border-ink-red/30 bg-ink-red/5 px-3 py-2 text-sm">
+              <p className="rounded border border-ink-red/30 bg-ink-red/5 px-3 py-2 text-sm">
                 {error}
               </p>
             )}
@@ -258,7 +258,7 @@ export function MeetingNotesDialog({
               />
               <UsageNote effort={res.effort} usage={res.usage} />
             </div>
-            <div className="md rounded-lg bg-raised p-3 text-sm">
+            <div className="md rounded bg-raised p-3 text-sm">
               <ReactMarkdown>{res.summary}</ReactMarkdown>
             </div>
             {res.tasks.length > 0 && (
@@ -268,7 +268,7 @@ export function MeetingNotesDialog({
                 </p>
                 <ul className="space-y-2">
                   {res.tasks.map((t, i) => (
-                    <li key={i} className="flex gap-2 rounded-lg border p-2">
+                    <li key={i} className="flex gap-2 rounded border p-2">
                       <Checkbox
                         className="mt-0.5"
                         checked={picked.has(i)}
