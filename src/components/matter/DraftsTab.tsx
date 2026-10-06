@@ -60,12 +60,13 @@ function NewDraft({ matter, onDone }: { matter: Tables<"matters">; onDone: (d?: 
       r.answers.forEach((x) => { if (x.value && !a[x.field]) { a[x.field] = x.value; w[x.field] = x.why; } });
       setAnswers(a); setWhys(w);
     } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+    return;
   }
 
   async function create() {
     if (!tpl) return;
     const { data, error } = await supabase.from("drafts").insert({ matter_id: matter.id, template_id: tpl.id, title: `${tpl.name} — ${matter.client ?? matter.title}`, body: fillTemplate(tpl.body, answers) }).select().single();
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     await logActivity(matter.id, `Created draft from house template "${tpl.name}"`);
     qc.invalidateQueries({ queryKey: ["drafts", matter.id] });
     onDone(data);
@@ -145,6 +146,7 @@ function DraftEditor({ matter, draft, onBack }: { matter: Tables<"matters">; dra
   }
   function decide(i: number, accept: boolean) {
     const e = edits[i];
+    if (!e) return;
     if (accept) setBody((b) => b.replace(e.original, e.suggested));
     setEdits(edits.map((x, j) => (j === i ? { ...x, state: accept ? "accepted" : "rejected" } : x)));
   }

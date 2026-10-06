@@ -30,7 +30,7 @@ export function MeetingNotesDialog({ matterId, open, onOpenChange }: { matterId:
   function dictate() {
     const W = window as unknown as { SpeechRecognition?: new () => never; webkitSpeechRecognition?: new () => never };
     const SR = W.SpeechRecognition ?? W.webkitSpeechRecognition;
-    if (!SR) return toast.error("Dictation isn't supported in this browser.");
+    if (!SR) { toast.error("Dictation isn't supported in this browser."); return; }
     if (listening) { recRef.current?.stop(); return; }
     const rec = new SR() as unknown as {
       continuous: boolean; interimResults: boolean; start: () => void; stop: () => void;
@@ -41,7 +41,7 @@ export function MeetingNotesDialog({ matterId, open, onOpenChange }: { matterId:
     rec.interimResults = false;
     rec.onresult = (e) => {
       let t = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) t += e.results[i][0].transcript + " ";
+      for (let i = e.resultIndex; i < e.results.length; i++) { const r = e.results[i]; if (r?.isFinal) t += r[0].transcript + " "; }
       if (t) setNotes((n) => (n ? n + " " : "") + t.trim());
     };
     rec.onend = () => setListening(false);

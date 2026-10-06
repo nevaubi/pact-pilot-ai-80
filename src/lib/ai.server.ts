@@ -74,7 +74,7 @@ export async function aiObject<T extends z.ZodTypeAny>(
   instructions: string,
   prompt: string,
   schema: T,
-): Promise<{ output: z.infer<T>; usage: { inputTokens?: number; outputTokens?: number } }> {
+): Promise<{ output: z.infer<T>; usage: { inputTokens?: number | undefined; outputTokens?: number | undefined } }> {
   const result = streamText({
     model: provider().responses(MODEL),
     system: `${BASE_INSTRUCTIONS}\n\n${instructions}`,
@@ -86,7 +86,7 @@ export async function aiObject<T extends z.ZodTypeAny>(
     const output = await result.output;
     return { output, usage: await result.usage };
   } catch (e) {
-    const text = await result.text.catch(() => "");
+    const text = await Promise.resolve(result.text).catch(() => "");
     try {
       return { output: JSON.parse(text), usage: await result.usage };
     } catch {

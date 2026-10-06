@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 type Turn = { q: string; a?: string; effort: Effort; tokens?: number };
 
-const VERBS: Record<string, string[]> = {
+const VERBS: Record<string, string[] | undefined> = {
   common: ["Catch me up", "What's due in the next two weeks?", "Draft a status email to the client"],
   Corporate: ["List customary diligence items still open", "Flag tax points to raise with the client's CPA"],
   "Real Estate": ["What title and survey items should I check?", "Outline the path to closing"],
@@ -52,7 +52,7 @@ export function AssistPanel({ matter, open, onOpenChange }: { matter: Tables<"ma
     }
   }
 
-  const verbs = [...VERBS.common, ...(VERBS[matter.practice_area] ?? [])];
+  const verbs = [...(VERBS["common"] ?? []), ...(VERBS[matter.practice_area] ?? [])];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

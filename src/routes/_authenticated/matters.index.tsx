@@ -122,7 +122,7 @@ function NewMatter() {
   async function save() {
     if (!f.title.trim()) return;
     const { data, error } = await supabase.from("matters").insert({ ...f, number: f.number || `${new Date().getFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}` }).select().single();
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     await logActivity(data.id, "Matter opened");
     qc.invalidateQueries({ queryKey: ["matters"] });
     setOpen(false);

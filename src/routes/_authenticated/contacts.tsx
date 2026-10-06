@@ -62,7 +62,7 @@ function NewContact() {
   async function save() {
     if (!f.name.trim()) return;
     const { error } = await supabase.from("contacts").insert(f);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["contacts"] });
     setOpen(false);
     setF({ name: "", organization: "", role: "", email: "", phone: "" });

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { queryOptions } from "@tanstack/react-query";
+import type { Tables } from "@/integrations/supabase/types";
 
 export const PRACTICE_AREAS = ["Corporate", "Real Estate", "Estate Planning", "Finance", "Compliance"] as const;
 export const STATUSES = ["Intake", "Active", "Closing", "On hold", "Closed"] as const;
@@ -32,9 +33,9 @@ export const tableQ = <T extends "tasks" | "deadlines" | "notes" | "files" | "dr
     queryKey: [table, matterId],
     queryFn: () => {
       const order = table === "closing_items" ? "position" : table === "deadlines" ? "due_on" : "created_at";
-      return q(
-        supabase.from(table).select("*").eq("matter_id", matterId).order(order, { ascending: order !== "created_at" }),
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const t = supabase.from(table as any) as any;
+      return q<Tables<T>[]>(t.select("*").eq("matter_id", matterId).order(order, { ascending: order !== "created_at" }));
     },
   });
 export const matterContactsQ = (matterId: string) =>

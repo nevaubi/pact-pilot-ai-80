@@ -36,7 +36,7 @@ export function ClosingTab({ matterId }: { matterId: string }) {
     await supabase.from("closing_items").insert({ matter_id: matterId, deliverable: d, responsible: r || null, position: data.length + 1 });
     setD(""); setR(""); inv();
   }
-  async function patch(id: string, p: Record<string, unknown>) {
+  async function patch(id: string, p: { responsible?: string; status?: string; due_on?: string | null; notes?: string }) {
     await supabase.from("closing_items").update(p).eq("id", id);
     inv();
   }

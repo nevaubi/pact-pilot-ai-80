@@ -61,7 +61,7 @@ export function Overview({ matter, onTab }: { matter: Tables<"matters">; onTab: 
   );
 }
 
-function Stat({ label, value, sub, onClick, tone }: { label: string; value: string; sub?: string | null; onClick: () => void; tone: string }) {
+function Stat({ label, value, sub, onClick, tone }: { label: string; value: string; sub?: string | null | undefined; onClick: () => void; tone: string }) {
   return (
     <button onClick={onClick} className="rounded-xl border bg-card p-4 text-left hover:shadow-sm">
       <p className="text-xs text-muted-foreground">{label}</p>

@@ -31,7 +31,7 @@ Recent notes:\n${(n.data ?? []).map((x) => `- ${x.title ?? "Note"}: ${x.body.sli
 Files:\n${docs || "none"}`;
 }
 
-async function logRun(ctx: Ctx, matterId: string | null, kind: string, effort: Effort, usage: { inputTokens?: number; outputTokens?: number }) {
+async function logRun(ctx: Ctx, matterId: string | null, kind: string, effort: Effort, usage: { inputTokens?: number | undefined; outputTokens?: number | undefined }) {
   await ctx.supabase.from("ai_runs").insert({
     matter_id: matterId,
     user_id: ctx.userId,
