@@ -76,6 +76,7 @@ export function AssistPanel({
   const [busy, setBusy] = useState(false);
   const runIdRef = useRef<string | undefined>(undefined);
   const abortRef = useRef<AbortController | null>(null);
+  const initialSentRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
@@ -102,11 +103,6 @@ export function AssistPanel({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns]);
   useEffect(() => () => abortRef.current?.abort(), []);
-
-  useEffect(() => {
-    if (!open || !initialPrompt || busy) return;
-    setQ(initialPrompt);
-  }, [open, initialPrompt, busy]);
 
   const patch = (id: string, p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) =>
     setTurns((ts) =>
@@ -205,6 +201,12 @@ export function AssistPanel({
       abortRef.current = null;
     }
   }
+
+  useEffect(() => {
+    if (!open || !initialPrompt || busy || initialSentRef.current === initialPrompt) return;
+    initialSentRef.current = initialPrompt;
+    void send(initialPrompt);
+  }, [open, initialPrompt, busy]);
 
   function stop() {
     abortRef.current?.abort();

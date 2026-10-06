@@ -86,6 +86,7 @@ function MatterPage() {
   }, [m, id, qc, tab]);
 
   async function exportSummary() {
+    if (!m) return;
     const [tasks, deadlines, closing] = await Promise.all([
       qc.ensureQueryData(tableQ("tasks", id)),
       qc.ensureQueryData(tableQ("deadlines", id)),
@@ -111,7 +112,7 @@ function MatterPage() {
         <Skeleton className="h-4 w-20" />
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-4 w-1/3" />
-        <Skeleton className="mt-6 h-40 w-full rounded-xl" />
+        <Skeleton className="mt-6 h-40 w-full rounded" />
       </div>
     );
   }
