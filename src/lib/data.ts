@@ -24,7 +24,7 @@ export const mattersQ = queryOptions({
   queryFn: () => q(supabase.from("matters").select("*").order("created_at", { ascending: false })),
 });
 export const matterQ = (id: string) =>
-  queryOptions({ queryKey: ["matter", id], queryFn: () => q(supabase.from("matters").select("*").eq("id", id).single()) });
+  queryOptions({ queryKey: ["matter", id], queryFn: () => q<Tables<"matters">>(supabase.from("matters").select("*").eq("id", id).single()) });
 export const tableQ = <T extends "tasks" | "deadlines" | "notes" | "files" | "drafts" | "closing_items" | "activity">(
   table: T,
   matterId: string,
