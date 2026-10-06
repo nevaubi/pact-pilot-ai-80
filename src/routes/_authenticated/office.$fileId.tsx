@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, Save, History, PanelRight } from "lucide-react";
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/office/$fileId")({
 });
 
 /** An editor crash must not take the whole app down: log it, explain, and offer a way back. */
-function OfficeError({ error, reset }: { error: Error; reset: () => void }) {
+function OfficeError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
   const { fileId } = Route.useParams();
   useEffect(() => {
