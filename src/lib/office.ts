@@ -81,7 +81,7 @@ export async function saveNewVersion(
     p_expected_path: expectedPath,
     p_new_path: newPath,
     p_size: blob.size,
-    p_extracted_text: o.text ?? null,
+    ...(o.text != null ? { p_extracted_text: o.text } : {}),
     p_update_text: o.text !== undefined,
     ...(o.note ? { p_note: o.note } : {}),
   });
