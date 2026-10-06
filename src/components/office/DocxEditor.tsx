@@ -105,11 +105,13 @@ export function wordEngine(d: DocApi): WordEngine {
         expectedRevision,
         steps: steps(s),
       };
-      const r = await d.mutations.apply(input);
+      // Treat the receipt as untrusted shape: a missing or malformed receipt must fail, not throw past the check.
+      const r: unknown = await d.mutations.apply(input);
+      const x = (r && typeof r === "object" ? r : {}) as Partial<Awaited<ReturnType<DocApi["mutations"]["apply"]>>>;
       return {
-        success: r.success,
-        revision: r.revision,
-        steps: r.steps.map((x) => ({ stepId: x.stepId, effect: x.effect })),
+        success: x.success,
+        ...(x.revision ? { revision: x.revision } : {}),
+        steps: Array.isArray(x.steps) ? x.steps.map((s) => ({ stepId: s.stepId, effect: s.effect })) : [],
       };
     },
     count: async (text) => {
