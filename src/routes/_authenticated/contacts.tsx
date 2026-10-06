@@ -28,6 +28,7 @@ export const Route = createFileRoute("/_authenticated/contacts")({
     ],
   }),
   component: Contacts,
+  loader: ({ context }) => context.queryClient.ensureQueryData(contactsQ),
 });
 
 type Contact = Tables<"contacts">;

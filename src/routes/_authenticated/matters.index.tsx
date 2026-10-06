@@ -44,6 +44,7 @@ export const Route = createFileRoute("/_authenticated/matters/")({
     ],
   }),
   component: Matters,
+  loader: ({ context }) => context.queryClient.ensureQueryData(mattersQ),
 });
 
 const VIEW_KEY = "mirza-matters-view";

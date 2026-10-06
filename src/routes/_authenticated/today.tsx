@@ -19,6 +19,11 @@ export const Route = createFileRoute("/_authenticated/today")({
     ],
   }),
   component: Today,
+  loader: ({ context }) => Promise.all([
+    context.queryClient.ensureQueryData({ queryKey: ["today-deadlines"], queryFn: () => q(supabase.from("deadlines").select("*, matters!inner(id,title,status)").neq("matters.status", "Closed").gte("due_on", new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)).lte("due_on", new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)).order("due_on").limit(15)) }),
+    context.queryClient.ensureQueryData({ queryKey: ["today-tasks"], queryFn: () => q(supabase.from("tasks").select("*, matters!inner(id,title,status)").eq("done", false).neq("matters.status", "Closed").order("due_on", { nullsFirst: false }).limit(20)) }),
+    context.queryClient.ensureQueryData({ queryKey: ["today-activity"], queryFn: () => q(supabase.from("activity").select("*, matters(id,title)").order("created_at", { ascending: false }).limit(15)) }),
+  ]),
 });
 
 async function q<T>(

@@ -35,6 +35,7 @@ export const Route = createFileRoute("/_authenticated/templates")({
     ],
   }),
   component: Templates,
+  loader: ({ context }) => context.queryClient.ensureQueryData(templatesQ),
 });
 
 type Tpl = Tables<"templates">;

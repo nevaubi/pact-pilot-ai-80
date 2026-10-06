@@ -63,10 +63,12 @@ export function AssistPanel({
   matter,
   open,
   onOpenChange,
+  initialPrompt,
 }: {
   matter: Tables<"matters">;
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  initialPrompt?: string | undefined;
 }) {
   const [effort, setEffort] = useEffort();
   const [q, setQ] = useState("");
@@ -100,6 +102,11 @@ export function AssistPanel({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [turns]);
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => {
+    if (!open || !initialPrompt || busy) return;
+    setQ(initialPrompt);
+  }, [open, initialPrompt, busy]);
 
   const patch = (id: string, p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) =>
     setTurns((ts) =>
