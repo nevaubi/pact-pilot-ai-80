@@ -28,13 +28,11 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
   const [wasmUrl, setWasmUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const registryRef = useRef<Registry | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
+  // The viewer reads its document URL once at start-up, so the URL must outlive dev double-mounts;
+  // it is released a minute after the viewer goes away.
+  const url = useMemo(() => URL.createObjectURL(blob), [blob]);
   const docId = useMemo(() => `doc-${crypto.randomUUID().slice(0, 8)}`, []);
-  useEffect(() => {
-    const u = URL.createObjectURL(blob);
-    setUrl(u);
-    return () => URL.revokeObjectURL(u);
-  }, [blob]);
+  useEffect(() => () => void setTimeout(() => URL.revokeObjectURL(url), 60000), [url]);
 
   useEffect(() => {
     let disposed = false;
