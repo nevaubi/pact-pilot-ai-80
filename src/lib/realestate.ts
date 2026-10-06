@@ -339,7 +339,7 @@ export function requirementsFor(p: Property, o: { foreignSeller: boolean; entity
           title: "Certificate of Zoning Compliance (residential buildings with five or fewer units)",
           responsible: "Seller",
           when: "Before closing",
-          cite: "Chicago Mun. Code 13-12-? — see Dept. of Planning page",
+          cite: "Chicago Dept. of Planning & Development — Certificate of Zoning Compliance",
           key: "chicago:zoning",
           note: "Not required for condominium units or co-ops; confirms the legal number of dwelling units.",
           verify: true,

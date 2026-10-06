@@ -4,6 +4,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
+export { reviewTitleSurvey } from "./realestate.functions";
+
 // All AI calls live here (auth-protected) and in src/routes/api/assist.ts (streaming chat).
 // Helpers (provider, context, logging) are in ai.server.ts and loaded inside handlers only.
 
