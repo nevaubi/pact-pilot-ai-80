@@ -190,17 +190,18 @@ function AuthPage() {
                       ? "Send reset link"
                       : "Update password"}
             </Button>
-            {mode !== "reset" && (
+            {mode === "in" && (
+              <p className="text-center text-xs text-muted-foreground">
+                Accounts are by invitation from your firm.
+              </p>
+            )}
+            {mode === "forgot" && (
               <button
                 type="button"
                 className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => setMode(mode === "in" ? "up" : "in")}
+                onClick={() => setMode("in")}
               >
-                {mode === "in"
-                  ? "New to Mirza? Create an account"
-                  : mode === "up"
-                    ? "Already have an account? Sign in"
-                    : "Back to sign in"}
+                Back to sign in
               </button>
             )}
           </form>
