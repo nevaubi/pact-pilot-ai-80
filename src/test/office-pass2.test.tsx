@@ -7,6 +7,7 @@ import { createNdjsonDecoder } from "@/lib/ndjson";
 const session = vi.hoisted(() => ({ gate: null as null | Promise<void> }));
 const rpc = vi.hoisted(() => ({
   result: { data: null as unknown, error: null as null | { code?: string; message: string } },
+  echo: false,
   calls: [] as unknown[],
   uploads: [] as string[],
   removed: [] as string[],
@@ -21,6 +22,8 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
     rpc: async (name: string, args: unknown) => {
       rpc.calls.push({ name, args });
+      if (rpc.echo)
+        return { data: [{ path: (args as { p_new_path: string }).p_new_path, version_id: "v" }], error: null };
       return rpc.result;
     },
     storage: {
@@ -163,18 +166,12 @@ describe("conflict-safe save (11)", () => {
     rpc.removed = [];
   });
   it("uploads first, then one RPC with the session's expected path", async () => {
-    rpc.result = { data: null, error: null };
-    rpc.result.data = [{ path: "PLACEHOLDER", version_id: "v" }];
-    const blob = new Blob(["x"], { type: "text/plain" });
-    // The RPC echoes the path it was given.
-    rpc.result = { data: null, error: null };
-    const origRpc = rpc.result;
-    void origRpc;
-    const p = saveNewVersion(file, "m1/old.docx", blob, { text: "t" });
-    await waitFor(() => expect(rpc.uploads).toHaveLength(1));
-    // Fill the response with the uploaded path before the promise resolves.
-    rpc.result.data = [{ path: rpc.uploads[0], version_id: "v" }];
-    await expect(p).resolves.toBe(rpc.uploads[0]);
+    rpc.echo = true;
+    const out = await saveNewVersion(file, "m1/old.docx", new Blob(["x"]), { text: "t" });
+    rpc.echo = false;
+    expect(rpc.uploads).toHaveLength(1);
+    expect(out).toBe(rpc.uploads[0]);
+    expect(rpc.uploads[0]!.startsWith("m1/")).toBe(true);
     expect((rpc.calls[0] as { args: Record<string, unknown> }).args).toMatchObject({
       p_file_id: "f1",
       p_expected_path: "m1/old.docx",
