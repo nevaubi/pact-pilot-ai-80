@@ -6,6 +6,45 @@ import { z } from "zod";
 // mode "draft" is handled by src/lib/office-stream.server.ts (bounded tool loop).
 // Wire format: newline-delimited JSON events — {t:"delta",text} | {t:"done",usage,runId} | {t:"error",message,retryable}
 
+/** Largest request body accepted (open document + references + workbook snapshot, UTF-8). */
+const MAX_BODY_BYTES = 4_000_000;
+const MAX_HISTORY_CHARS = 40_000;
+const MAX_WORKBOOK_CELLS = 20_000;
+const MAX_WORKBOOK_TEXT = 1_000_000;
+const MAX_ATTACHMENT_TOTAL = 400_000;
+
+/** Read at most `max` bytes; a larger body is refused before it is fully buffered. */
+async function readBody(request: Request, max: number): Promise<{ json: unknown } | { status: number; message: string }> {
+  const declared = Number(request.headers.get("content-length") ?? "");
+  if (Number.isFinite(declared) && declared > max)
+    return { status: 413, message: `Request too large (${Math.round(declared / 1e6)} MB; limit ${max / 1e6} MB). Attach fewer or smaller references.` };
+  const reader = request.body?.getReader();
+  if (!reader) return { status: 400, message: "Invalid request." };
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => {});
+      return { status: 413, message: `Request too large (limit ${max / 1e6} MB). Attach fewer or smaller references.` };
+    }
+    chunks.push(value);
+  }
+  const buf = new Uint8Array(size);
+  let off = 0;
+  for (const c of chunks) {
+    buf.set(c, off);
+    off += c.byteLength;
+  }
+  try {
+    return { json: JSON.parse(new TextDecoder().decode(buf)) };
+  } catch {
+    return { status: 400, message: "Invalid request." };
+  }
+}
+
 const bodyZ = z.object({
   matterId: z.string().uuid(),
   effort: z.enum(["normal", "advanced"]),
@@ -59,6 +98,23 @@ const bodyZ = z.object({
     )
     .max(5)
     .optional(),
+}).superRefine((b, ctx) => {
+  // Aggregates are validated here, before any tool context is built — never silently sliced later.
+  const hist = (b.history ?? []).reduce((n, t) => n + t.q.length + t.a.length, 0);
+  if (hist > MAX_HISTORY_CHARS) ctx.addIssue({ code: "custom", message: "Conversation history too long." });
+  const att = (b.attachments ?? []).reduce((n, a) => n + a.text.length, 0);
+  if (att > MAX_ATTACHMENT_TOTAL)
+    ctx.addIssue({ code: "custom", message: `References total ${att} characters; the limit is ${MAX_ATTACHMENT_TOTAL}.` });
+  const sheets = b.document?.workbook?.sheets ?? [];
+  let cells = 0;
+  let text = 0;
+  for (const sh of sheets)
+    for (const c of Object.values(sh.cells)) {
+      cells++;
+      text += (typeof c.v === "string" ? c.v.length : 0) + (c.f?.length ?? 0);
+    }
+  if (cells > MAX_WORKBOOK_CELLS || text > MAX_WORKBOOK_TEXT)
+    ctx.addIssue({ code: "custom", message: "Workbook snapshot too large." });
 });
 
 /** Character budget for the open document per effort (the matter's other files still come through matterContext). */
@@ -82,8 +138,14 @@ export const Route = createFileRoute("/api/assist")({
         const auth = await authFromRequest(request).catch(() => null);
         if (!auth) return Response.json({ message: "Please sign in again." }, { status: 401 });
 
-        const parsed = bodyZ.safeParse(await request.json().catch(() => null));
-        if (!parsed.success) return Response.json({ message: "Invalid request." }, { status: 400 });
+        const raw = await readBody(request, MAX_BODY_BYTES);
+        if ("status" in raw) return Response.json({ message: raw.message, retryable: false }, { status: raw.status });
+        const parsed = bodyZ.safeParse(raw.json);
+        if (!parsed.success)
+          return Response.json(
+            { message: parsed.error.issues.find((i) => i.code === "custom")?.message ?? "Invalid request.", retryable: false },
+            { status: parsed.error.issues.some((i) => i.code === "custom") ? 413 : 400 },
+          );
         const { matterId, effort, question, history, runId, document: doc } = parsed.data;
         const mode = parsed.data.mode ?? "assist";
         if (mode === "draft") {
