@@ -21,6 +21,7 @@ import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated/
 import { Route as ApiAssistRouteImport } from './routes/api/assist'
 import { Route as AuthenticatedMattersIndexRouteImport } from './routes/_authenticated/matters.index'
 import { Route as AuthenticatedMattersIdRouteImport } from './routes/_authenticated/matters.$id'
+import { Route as AuthenticatedOfficeFileIdRouteImport } from './routes/_authenticated/office.$fileId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -82,6 +83,12 @@ const AuthenticatedMattersIdRoute = AuthenticatedMattersIdRouteImport.update({
   path: '/matters/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedOfficeFileIdRoute =
+  AuthenticatedOfficeFileIdRouteImport.update({
+    id: '/office/$fileId',
+    path: '/office/$fileId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
   '/matters/$id': typeof AuthenticatedMattersIdRoute
+  '/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
   '/matters/': typeof AuthenticatedMattersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -107,6 +115,7 @@ export interface FileRoutesByTo {
   '/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
   '/matters/$id': typeof AuthenticatedMattersIdRoute
+  '/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
   '/matters': typeof AuthenticatedMattersIndexRoute
 }
 export interface FileRoutesById {
@@ -122,6 +131,7 @@ export interface FileRoutesById {
   '/_authenticated/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
   '/_authenticated/matters/$id': typeof AuthenticatedMattersIdRoute
+  '/_authenticated/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
   '/_authenticated/matters/': typeof AuthenticatedMattersIndexRoute
 }
 export interface FileRouteTypes {
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/today'
     | '/api/assist'
     | '/matters/$id'
+    | '/office/$fileId'
     | '/matters/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/today'
     | '/api/assist'
     | '/matters/$id'
+    | '/office/$fileId'
     | '/matters'
   id:
     | '__root__'
@@ -164,6 +176,7 @@ export interface FileRouteTypes {
     | '/_authenticated/today'
     | '/api/assist'
     | '/_authenticated/matters/$id'
+    | '/_authenticated/office/$fileId'
     | '/_authenticated/matters/'
   fileRoutesById: FileRoutesById
 }
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMattersIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/office/$fileId': {
+      id: '/_authenticated/office/$fileId'
+      path: '/office/$fileId'
+      fullPath: '/office/$fileId'
+      preLoaderRoute: typeof AuthenticatedOfficeFileIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -271,6 +291,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
   AuthenticatedTodayRoute: typeof AuthenticatedTodayRoute
   AuthenticatedMattersIdRoute: typeof AuthenticatedMattersIdRoute
+  AuthenticatedOfficeFileIdRoute: typeof AuthenticatedOfficeFileIdRoute
   AuthenticatedMattersIndexRoute: typeof AuthenticatedMattersIndexRoute
 }
 
@@ -282,6 +303,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
   AuthenticatedTodayRoute: AuthenticatedTodayRoute,
   AuthenticatedMattersIdRoute: AuthenticatedMattersIdRoute,
+  AuthenticatedOfficeFileIdRoute: AuthenticatedOfficeFileIdRoute,
   AuthenticatedMattersIndexRoute: AuthenticatedMattersIndexRoute,
 }
 

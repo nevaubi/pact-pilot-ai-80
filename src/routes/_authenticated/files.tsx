@@ -104,6 +104,9 @@ function FilesHub() {
                     <span className="hidden text-xs text-muted-foreground sm:block">
                       {fmtDate(f.created_at.slice(0, 10))}
                     </span>
+                    <Button asChild size="sm" variant="ghost" className="h-7 text-xs">
+                      <Link to="/office/$fileId" params={{ fileId: f.id }} aria-label={`Open ${f.name} in editor`}>Open</Link>
+                    </Button>
                     <Button
                       size="icon"
                       variant="ghost"

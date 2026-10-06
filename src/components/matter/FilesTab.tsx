@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -234,6 +235,9 @@ export function FilesTab({ matterId }: { matterId: string }) {
                     >
                       <Map className="mr-1.5 h-3.5 w-3.5" />
                       Map this deal
+                    </Button>
+                    <Button asChild size="sm" variant="ghost" className="h-7 text-xs">
+                      <Link to="/office/$fileId" params={{ fileId: f.id }} aria-label={`Open ${f.name} in editor`}>Open</Link>
                     </Button>
                     <Button
                       size="icon"
