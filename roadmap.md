@@ -3,7 +3,7 @@
 Priority order: (a) broken → (b) core non-AI flows → (c) AI desk → (d) polish.
 
 ## Ready (next pass)
-- [ ] OCR for scanned PDFs (the 10 MB upload on "1420 W. Fulton Purchase" has no readable text, so it can't be mapped)
+- [x] OCR for scanned PDFs (browser Tesseract, auto on upload + "Read scanned text" button)
 - [ ] Matter-level "Catch me up" memo button that files the Assist summary as a note in one click
 - [ ] Bulk edit on the closing checklist (reorder by drag, multi-select status)
 - [ ] Deadline reminders on Today for the next 30 days with a per-user "mine only" filter

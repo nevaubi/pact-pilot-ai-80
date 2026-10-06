@@ -5,7 +5,7 @@ import { FileText, Upload, Map, Download, ScanText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { mapDocument } from "@/lib/ai.functions";
-import { extractText } from "@/lib/extract";
+import { extractText, ocrPdf } from "@/lib/extract";
 import { tableQ, logActivity, fmtDate } from "@/lib/data";
 import { mut, tryAction, humanize } from "@/lib/mutate";
 import { useEffort } from "@/hooks/use-effort";
@@ -32,7 +32,11 @@ import { toast } from "sonner";
 export const MAX_FILE_MB = 25;
 const ACCEPT = ".pdf,.docx,.txt,.md";
 
-export async function uploadMatterFile(matterId: string | null, file: File) {
+export async function uploadMatterFile(
+  matterId: string | null,
+  file: File,
+  onOcr?: (page: number, total: number) => void,
+) {
   if (file.size > MAX_FILE_MB * 1024 * 1024)
     throw new Error(`${file.name} is larger than ${MAX_FILE_MB} MB.`);
   const path = `${matterId ?? "firm"}/${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, "_")}`;
@@ -44,6 +48,17 @@ export async function uploadMatterFile(matterId: string | null, file: File) {
     text = (await extractText(file)).replace(/\s+\n/g, "\n").trim().slice(0, 300000);
   } catch {
     readable = false;
+  }
+  if (text.length < 50 && file.name.toLowerCase().endsWith(".pdf")) {
+    try {
+      const o = (await ocrPdf(file, onOcr)).slice(0, 300000);
+      if (o.length > text.length) {
+        text = o;
+        readable = true;
+      }
+    } catch {
+      /* keep stored; user can retry from the list */
+    }
   }
   const { data, error: e2 } = await supabase
     .from("files")
@@ -99,20 +114,38 @@ export function FilesTab({ matterId }: { matterId: string }) {
     const files = Array.from(list ?? []);
     if (!files.length) return;
     for (const f of files) {
-      setBusy(f.name);
+      setBusy(`Uploading ${f.name}…`);
       await tryAction(async () => {
-        const { readable } = await uploadMatterFile(matterId, f);
+        const { readable } = await uploadMatterFile(matterId, f, (p, n) =>
+          setBusy(`Reading scanned page ${p} of ${n} — ${f.name}`),
+        );
         await logActivity(matterId, `Added file ${f.name}`);
         if (readable)
           toast.success(`${f.name} added`, { description: "Text extracted — ready to map." });
         else
           toast.warning(`${f.name} added, but no readable text`, {
-            description:
-              "Scanned PDFs and images can't be mapped yet. The file is still stored on the matter.",
+            description: "Text couldn't be read from this file. It is still stored on the matter.",
           });
       }, "Upload failed");
       refresh();
     }
+    setBusy(null);
+  }
+
+  async function readScanned(f: Tables<"files">) {
+    setBusy(`Reading ${f.name}…`);
+    await tryAction(async () => {
+      const { data, error } = await supabase.storage.from("matter-files").download(f.path);
+      if (error || !data) throw new Error(humanize(error?.message ?? "Download failed"));
+      const text = (
+        await ocrPdf(data, (p, n) => setBusy(`Reading scanned page ${p} of ${n} — ${f.name}`))
+      ).slice(0, 300000);
+      if (text.length < 20) throw new Error("No text could be recognised in this document.");
+      await mut(supabase.from("files").update({ extracted_text: text }).eq("id", f.id).select("id"), {
+        success: `${f.name}: text read — ready to map`,
+      });
+      refresh();
+    }, "Couldn't read the scanned document");
     setBusy(null);
   }
 
@@ -133,7 +166,7 @@ export function FilesTab({ matterId }: { matterId: string }) {
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
         <p className="text-sm font-medium">
-          {busy ? `Uploading ${busy}…` : "Drop deal documents here, or click to choose"}
+          {busy ?? "Drop deal documents here, or click to choose"}
         </p>
         <p className="text-xs text-muted-foreground">
           PDF, Word (.docx) or text, up to {MAX_FILE_MB} MB. LOIs, agreements, questionnaires.
@@ -176,6 +209,18 @@ export function FilesTab({ matterId }: { matterId: string }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
+                    {!f.extracted_text && f.name.toLowerCase().endsWith(".pdf") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!!busy}
+                        title="Recognise the text in this scanned PDF (runs in your browser, no AI cost)"
+                        onClick={() => readScanned(f)}
+                      >
+                        <ScanText className="mr-1.5 h-3.5 w-3.5" />
+                        Read scanned text
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"

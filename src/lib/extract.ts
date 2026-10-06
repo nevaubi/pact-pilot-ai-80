@@ -22,6 +22,40 @@ export async function extractText(file: File): Promise<string> {
   return await file.text();
 }
 
+/** OCR a scanned/image-only PDF in the browser (no AI, no tokens). Renders each page and reads it with Tesseract. */
+export async function ocrPdf(
+  data: Blob,
+  onProgress?: (page: number, total: number) => void,
+  maxPages = 40,
+): Promise<string> {
+  const pdfjs = await import("pdfjs-dist");
+  const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+  pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await data.arrayBuffer()) }).promise;
+  const { createWorker } = await import("tesseract.js");
+  const ocr = await createWorker("eng");
+  const total = Math.min(doc.numPages, maxPages);
+  const pages: string[] = [];
+  try {
+    for (let i = 1; i <= total; i++) {
+      onProgress?.(i, total);
+      const page = await doc.getPage(i);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvas, canvasContext: canvas.getContext("2d")!, viewport } as never)
+        .promise;
+      const { data: r } = await ocr.recognize(canvas);
+      pages.push(r.text);
+      canvas.width = canvas.height = 0;
+    }
+  } finally {
+    await ocr.terminate();
+  }
+  return pages.join("\n\n").replace(/[ \t]+\n/g, "\n").trim();
+}
+
 /** Template blanks: [[Field Name]] or {{Field Name}} */
 export function templateFields(body: string): string[] {
   const set = new Set<string>();
