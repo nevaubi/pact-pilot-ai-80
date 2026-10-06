@@ -134,7 +134,7 @@ function AuthPage() {
             </Button>
             {mode !== "reset" && (
               <button type="button" className="w-full text-center text-xs text-muted-foreground hover:text-foreground" onClick={() => setMode(mode === "in" ? "up" : "in")}>
-                {mode === "in" ? "New to Mirza? Create an account" : "Already have an account? Sign in"}
+                {mode === "in" ? "New to Mirza? Create an account" : mode === "up" ? "Already have an account? Sign in" : "Back to sign in"}
               </button>
             )}
           </form>
