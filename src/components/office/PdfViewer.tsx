@@ -139,11 +139,12 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
         onReady={(registry) => {
           registryRef.current = registry as unknown as Registry;
           onReady?.();
+          const start = Date.now();
           try {
             const ann = (registry as unknown as Registry).getPlugin("annotation")?.provides() as { onAnnotationEvent?: (cb: (e: unknown) => void) => void } | undefined;
             ann?.onAnnotationEvent?.((e) => {
               const ev = e as { type?: string };
-              if (ev?.type && ev.type !== "select" && ev.type !== "deselect") onDirty();
+              if (Date.now() - start > 1500 && ev?.type && !["select", "deselect", "loaded"].includes(ev.type)) onDirty();
             });
           } catch (e) {
             console.warn("[office:pdf:events]", e);
