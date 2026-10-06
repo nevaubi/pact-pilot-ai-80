@@ -380,7 +380,7 @@ Drafting rules:
 - Keep proposals as small as the request allows: a clause, a sentence, a paragraph — not a rewrite of the whole document unless asked.
 - When SOURCES are provided and a point of law matters, cite the tag like [S1] after the sentence (outside the draft block) and quote the operative words; never cite a tag that was not provided.
 - For questions (not drafting), answer plainly from the open document and the matter; quote the passage you rely on.`;
-  const sheet = kind === "xlsx" ? `\n- For spreadsheet work, put proposed cell values or formulas inside the draft block one per line as A1-style references, e.g. \`B12 = =SUM(B2:B11)\`; show the reasoning outside the block.` : "";
+  const sheet = kind === "xlsx" ? `\n- For spreadsheet work, put proposed cell values or formulas inside the draft block one per line as A1-style assignments, e.g. \`B12 = =SUM(B2:B11)\` or \`Deadlines!C4 = 2026-03-31\`; use the sheet name only when the cell is not on the active sheet, write formulas with a leading =, and put reasoning outside the block. The OPEN DOCUMENT lists each sheet by name with its cells.` : "";
   const effortLine = effort === "advanced" ? "\nAdvanced effort: check the proposal against the rest of the document for conflicts (defined terms, cross-references, inconsistent dates or amounts) and list anything the attorney should reconcile under 'For your review:'." : "\nNormal effort: be quick and concrete; end with one line 'For your review:'.";
   return common + sheet + effortLine;
 }

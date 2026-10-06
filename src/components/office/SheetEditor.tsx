@@ -12,10 +12,22 @@ type Props = {
   handle: Ref<EditorHandle | null>;
 };
 
+type FRange = {
+  getValues: () => unknown[][];
+  setValue: (v: string | number | boolean | null) => unknown;
+  setFormula: (f: string) => unknown;
+  getA1Notation: (withSheet?: boolean) => string;
+};
+type FSheet = {
+  getSheetName: () => string;
+  getRange: (a1: string) => FRange;
+  getSelection: () => { getActiveRange: () => FRange | null } | null;
+};
 type Api = {
   getActiveWorkbook: () => {
     save: () => WorkbookData;
-    getActiveSheet: () => { getSelection: () => { getActiveRange: () => { getValues: () => unknown[][]; setValue: (v: string) => void } | null } | null };
+    getActiveSheet: () => FSheet;
+    getSheetByName: (name: string) => FSheet | null;
   } | null;
   createWorkbook: (d: WorkbookData) => unknown;
   addEvent?: (ev: unknown, cb: (e: unknown) => void) => { dispose: () => void };
@@ -23,6 +35,38 @@ type Api = {
   onCommandExecuted?: (cb: (c: { id: string; type?: number }) => void) => { dispose: () => void };
   dispose?: () => void;
 };
+
+/** One `B12 = =SUM(B2:B11)` / `Deadlines!C4 = 2026-03-31` line from a proposal. */
+export type CellAssignment = { sheet?: string; cell: string; value: string };
+
+const CELL_LINE = /^\s*(?:[-*]\s*)?(?:`)?(?:(?:'([^']+)'|"([^"]+)"|([A-Za-z0-9_ ]+?))!)?\$?([A-Za-z]{1,3})\$?(\d{1,7})(?:`)?\s*(?::|=|→|->)\s*(.+?)\s*$/;
+
+/** Parse proposal lines into cell assignments; lines that aren't assignments are ignored. */
+export function parseCellAssignments(text: string): CellAssignment[] {
+  const out: CellAssignment[] = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const m = CELL_LINE.exec(raw);
+    if (!m) continue;
+    const [, q1, q2, bare, col = "", row = "", rhs = ""] = m;
+    if (!col || !row) continue;
+    let value = rhs.trim();
+    // Strip inline-code ticks and a trailing explanation after " — " or " // ".
+    value = value.replace(/^`([^`]*)`.*$/, "$1").replace(/\s+(?:—|–|\/\/|#)\s.*$/, "").trim();
+    if (/^".*"$/.test(value) || /^'.*'$/.test(value)) value = value.slice(1, -1);
+    const sheet = (q1 ?? q2 ?? bare)?.trim();
+    out.push({ ...(sheet ? { sheet } : {}), cell: `${col.toUpperCase()}${row}`, value });
+  }
+  return out;
+}
+
+function coerce(v: string): string | number | boolean | null {
+  if (v === "" || /^(blank|empty|null)$/i.test(v)) return null;
+  if (/^(true|false)$/i.test(v)) return v.toLowerCase() === "true";
+  const n = v.replace(/^\$/, "").replace(/,/g, "");
+  if (/^-?\d+(\.\d+)?$/.test(n)) return Number(n);
+  if (/^-?\d+(\.\d+)?%$/.test(n)) return Number(n.slice(0, -1)) / 100;
+  return v;
+}
 
 /** Spreadsheet editor on Univer (formulas, formatting, freeze, merges). Round-trips .xlsx through ExcelJS. */
 export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: Props) {
@@ -93,23 +137,50 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
       },
       getSelection: async () => {
         try {
-          const r = apiRef.current?.getActiveWorkbook()?.getActiveSheet().getSelection()?.getActiveRange();
+          const sheet = apiRef.current?.getActiveWorkbook()?.getActiveSheet();
+          const r = sheet?.getSelection()?.getActiveRange();
           const v = r?.getValues() ?? [];
-          if (v.length === 1 && v[0]?.length === 1) return "";
-          return v.map((row) => row.map((c) => (c == null ? "" : String(c))).join("\t")).join("\n").trim();
+          if (!r || !sheet || (v.length === 1 && v[0]?.length === 1)) return "";
+          const grid = v.map((row) => row.map((c) => (c == null ? "" : String(c))).join("\t")).join("\n").trim();
+          return `Selected ${r.getA1Notation()} on sheet "${sheet.getSheetName()}":\n${grid}`;
         } catch {
           return "";
         }
       },
       insert: async (text) => {
+        const wb = apiRef.current?.getActiveWorkbook();
+        if (!wb) return { ok: false, reason: "The spreadsheet isn't open yet." };
         try {
-          const r = apiRef.current?.getActiveWorkbook()?.getActiveSheet().getSelection()?.getActiveRange();
-          if (!r) return false;
-          r.setValue(text);
+          const assignments = parseCellAssignments(text);
+          if (assignments.length === 0) {
+            // Free text: put it in the selected cell only.
+            const r = wb.getActiveSheet().getSelection()?.getActiveRange();
+            if (!r) return { ok: false, reason: "Click a cell first, or ask for cell assignments like B12 = =SUM(B2:B11)." };
+            r.setValue(text.trim());
+            onDirty();
+            return { ok: true, tracked: false, how: "cells", detail: `Written to ${r.getA1Notation()}.` };
+          }
+          const missing: string[] = [];
+          const touched: string[] = [];
+          for (const a of assignments) {
+            const sheet = a.sheet ? wb.getSheetByName(a.sheet) : wb.getActiveSheet();
+            if (!sheet) {
+              missing.push(`${a.sheet}!${a.cell}`);
+              continue;
+            }
+            const range = sheet.getRange(a.cell);
+            if (a.value.startsWith("=")) range.setFormula(a.value);
+            else range.setValue(coerce(a.value));
+            touched.push(a.sheet ? `${a.sheet}!${a.cell}` : a.cell);
+          }
+          if (touched.length === 0) return { ok: false, reason: `No sheet named ${missing.map((m) => m.split("!")[0]).join(", ")} in this workbook.` };
           onDirty();
-          return true;
-        } catch {
-          return false;
+          const list = touched.length <= 6 ? touched.join(", ") : `${touched.slice(0, 5).join(", ")} and ${touched.length - 5} more`;
+          const skipped = missing.length ? ` Skipped ${missing.length} on an unknown sheet.` : "";
+          return { ok: true, tracked: false, how: "cells", detail: `Updated ${list}.${skipped} Review them, then save.` };
+        } catch (e) {
+          console.error("[office:xlsx:insert]", e);
+          return { ok: false, reason: e instanceof Error ? e.message : "The spreadsheet couldn't apply that change." };
         }
       },
       export: async () => {

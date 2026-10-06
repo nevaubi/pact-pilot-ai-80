@@ -17,6 +17,8 @@ export type Turn = {
   retryable?: boolean | undefined;
   /** Short label shown instead of the raw prompt (quick actions). */
   label?: string | undefined;
+  /** Text selected in the open document when this was asked (draft mode); Replace re-anchors to it. */
+  anchor?: string | undefined;
 };
 
 /** What the open document contributes to a drafting request. Built lazily per send so it is always current. */
@@ -102,7 +104,8 @@ export function useAssist(o: {
         .filter((t) => t.status === "done" && t.id !== opts.replaceId)
         .slice(-6)
         .map(({ q, a }) => ({ q, a }));
-      const turn: Turn = { id, q: question, a: "", effort, status: "streaming", label: opts.label };
+      const anchor = docRef.current?.()?.selection?.trim() || undefined;
+      const turn: Turn = { id, q: question, a: "", effort, status: "streaming", label: opts.label, anchor };
       setTurns((ts) => (opts.replaceId ? ts.map((t) => (t.id === opts.replaceId ? turn : t)) : [...ts, turn]));
       setBusy(true);
       const controller = new AbortController();

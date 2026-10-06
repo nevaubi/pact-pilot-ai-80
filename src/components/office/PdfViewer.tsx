@@ -6,6 +6,11 @@ type Registry = {
   getPlugin: (id: string) => { provides: () => unknown } | null | undefined;
 };
 
+type Task<T> = { toPromise: () => Promise<T> };
+type SelectionApi = { getSelectedText?: () => Task<string[]>; forDocument?: (id: string) => { getSelectedText: () => Task<string[]> } };
+type ExportApi = { saveAsCopy?: () => Task<ArrayBuffer>; forDocument?: (id: string) => { saveAsCopy: () => Task<ArrayBuffer> } };
+type AnnotationApi = { onAnnotationEvent?: (cb: (e: { type?: string; committed?: boolean }) => void) => (() => void) | void };
+
 type Props = {
   blob: Blob;
   name: string;
@@ -21,17 +26,18 @@ type Props = {
 /**
  * PDF viewer/annotator on EmbedPDF (PDFium in WebAssembly, runs entirely in the browser).
  * Highlights, notes, shapes, search and text selection come from the drop-in viewer; the
- * annotated copy is saved back to the matter as a new version.
+ * annotated copy is saved back to the matter as a new version. Nothing leaves the browser.
  */
 export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, onError, handle }: Props) {
   const [Viewer, setViewer] = useState<null | typeof import("@embedpdf/react-pdf-viewer").PDFViewer>(null);
-  const [wasmUrl, setWasmUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const registryRef = useRef<Registry | null>(null);
+  const offRef = useRef<(() => void) | null>(null);
   // The viewer reads its document URL once at start-up, so the URL must outlive dev double-mounts;
   // it is released a minute after the viewer goes away.
   const url = useMemo(() => URL.createObjectURL(blob), [blob]);
   const docId = useMemo(() => `doc-${crypto.randomUUID().slice(0, 8)}`, []);
+  const wasmUrl = typeof window !== "undefined" ? `${window.location.origin}/wasm/pdfium.wasm` : "";
   useEffect(() => () => void setTimeout(() => URL.revokeObjectURL(url), 60000), [url]);
 
   useEffect(() => {
@@ -39,9 +45,7 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
     (async () => {
       try {
         const { PDFViewer } = await import("@embedpdf/react-pdf-viewer");
-        if (disposed) return;
-        setViewer(() => PDFViewer);
-        setWasmUrl(`${window.location.origin}/wasm/pdfium.wasm`);
+        if (!disposed) setViewer(() => PDFViewer);
       } catch (e) {
         console.error("[office:pdf:init]", e);
         if (!disposed) setFailed(e instanceof Error ? e.message : "The PDF viewer couldn't start.");
@@ -49,22 +53,10 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
     })();
     return () => {
       disposed = true;
+      offRef.current?.();
+      offRef.current = null;
     };
   }, []);
-
-  // Watch annotation commits so the shell knows there is something to save.
-  useEffect(() => {
-    const reg = registryRef.current;
-    if (!reg) return;
-    const ann = reg.getPlugin("annotation")?.provides() as { onAnnotationEvent?: (cb: (e: unknown) => void) => (() => void) | void } | undefined;
-    const off = ann?.onAnnotationEvent?.((e) => {
-      const ev = e as { type?: string };
-      if (ev?.type === "create" || ev?.type === "update" || ev?.type === "delete" || ev?.type === "commit") onDirty();
-    });
-    return () => {
-      if (typeof off === "function") off();
-    };
-  }, [onDirty, Viewer]);
 
   useImperativeHandle(
     handle,
@@ -74,9 +66,7 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
         const reg = registryRef.current;
         if (!reg) return "";
         try {
-          const sel = reg.getPlugin("selection")?.provides() as
-            | { getSelectedText?: () => { toPromise: () => Promise<string[]> }; forDocument?: (id: string) => { getSelectedText: () => { toPromise: () => Promise<string[]> } } }
-            | undefined;
+          const sel = reg.getPlugin("selection")?.provides() as SelectionApi | undefined;
           const scoped = sel?.forDocument?.(docId) ?? sel;
           const lines = await scoped?.getSelectedText?.().toPromise();
           return (lines ?? []).join("\n").trim();
@@ -84,16 +74,14 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
           return "";
         }
       },
-      insert: async () => false,
+      insert: async () => ({ ok: false, reason: "PDF text can't be edited here — copy the proposal, or open the Word original." }),
       export: async () => {
         const reg = registryRef.current;
         if (!reg) throw new Error("The viewer isn't ready yet.");
-        const exp = reg.getPlugin("export")?.provides() as
-          | { saveAsCopy?: () => { toPromise: () => Promise<ArrayBuffer> }; forDocument?: (id: string) => { saveAsCopy: () => { toPromise: () => Promise<ArrayBuffer> } } }
-          | undefined;
+        const exp = reg.getPlugin("export")?.provides() as ExportApi | undefined;
         const scoped = exp?.forDocument?.(docId) ?? exp;
         const buf = await scoped?.saveAsCopy?.().toPromise();
-        if (!buf) throw new Error("The viewer couldn't produce a PDF.");
+        if (!buf || !buf.byteLength) throw new Error("The viewer couldn't produce a PDF.");
         return new Blob([buf], { type: "application/pdf" });
       },
     }),
@@ -132,20 +120,21 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
             dark: { accent: { primary: "#3B82F6" } },
           },
           documentManager: { initialDocuments: [{ url, documentId: docId, name, autoActivate: true }] },
-          annotations: { annotationAuthor: author },
+          annotations: { annotationAuthor: author, deactivateToolAfterCreate: true },
           export: { defaultFileName: name },
           disabledCategories: ["signature"],
         }}
         onReady={(registry) => {
-          registryRef.current = registry as unknown as Registry;
+          const reg = registry as unknown as Registry;
+          registryRef.current = reg;
           onReady?.();
-          const start = Date.now();
           try {
-            const ann = (registry as unknown as Registry).getPlugin("annotation")?.provides() as { onAnnotationEvent?: (cb: (e: unknown) => void) => void } | undefined;
-            ann?.onAnnotationEvent?.((e) => {
-              const ev = e as { type?: string };
-              if (Date.now() - start > 1500 && ev?.type && !["select", "deselect", "loaded"].includes(ev.type)) onDirty();
+            const ann = reg.getPlugin("annotation")?.provides() as AnnotationApi | undefined;
+            const off = ann?.onAnnotationEvent?.((ev) => {
+              // 'loaded' fires when the document's existing annotations are read in; only user changes count.
+              if (ev.type === "create" || ev.type === "update" || ev.type === "delete") onDirty();
             });
+            if (typeof off === "function") offRef.current = off;
           } catch (e) {
             console.warn("[office:pdf:events]", e);
           }

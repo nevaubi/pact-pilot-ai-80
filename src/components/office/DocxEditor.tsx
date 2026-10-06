@@ -6,13 +6,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 export type DocMode = "editing" | "suggesting" | "viewing";
 
 /** What the Office shell and the drafting panel need from any editor. */
+/** Outcome of an AI-proposed edit the attorney clicked into the document. */
+export type InsertResult =
+  | { ok: true; tracked: boolean; how: "cursor" | "replace" | "cells"; detail?: string }
+  | { ok: false; reason: string };
+
 export type EditorHandle = {
   /** Full plain text of the open document (for AI context and re-indexing). */
   getText: () => Promise<string>;
   /** Currently selected text, "" when nothing is selected. */
   getSelection: () => Promise<string>;
-  /** Insert text at the cursor or replace the current selection. Returns false when the editor can't. */
-  insert: (text: string, mode: "cursor" | "replace") => Promise<boolean>;
+  /**
+   * Insert text at the cursor or replace the current selection. `anchor` is the text that was
+   * selected when the attorney asked; if the live selection is gone, the editor locates it again.
+   */
+  insert: (text: string, mode: "cursor" | "replace", anchor?: string) => Promise<InsertResult>;
   /** Serialize the current document for saving. */
   export: () => Promise<Blob>;
   setMode?: (mode: DocMode) => void;
@@ -34,10 +42,13 @@ type Props = {
 
 type DocApi = NonNullable<NonNullable<SuperDocType["activeEditor"]>["doc"]>;
 
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 /**
  * Word (.docx) editor on SuperDoc: page-faithful rendering, built-in toolbar, comments and
  * tracked changes. The AI never writes here directly — the shell calls `insert()` only after the
  * attorney clicks Insert/Replace, and in Suggesting mode those land as tracked changes.
+ * Telemetry is off: nothing about the firm's documents leaves the browser except to the firm's own storage.
  */
 export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, handle }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -52,30 +63,41 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
   useEffect(() => {
     let disposed = false;
     let instance: SuperDocType | null = null;
+    let poll: ReturnType<typeof setInterval> | undefined;
+    const markReady = () => {
+      if (disposed || readyRef.current) return;
+      // Load-time transactions fire editor updates; only count edits after the document settled.
+      setTimeout(() => {
+        readyRef.current = true;
+      }, 400);
+      setReady(true);
+      onReady?.();
+    };
     (async () => {
       try {
         const { SuperDoc } = await import("superdoc");
         if (disposed || !hostRef.current || !toolbarRef.current) return;
         hostRef.current.innerHTML = "";
         toolbarRef.current.innerHTML = "";
-        const file = new File([blob], name, { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+        const file = new File([blob], name, { type: DOCX_MIME });
         instance = new SuperDoc({
           selector: hostRef.current,
           documentMode: modeRef.current,
           role: modeRef.current === "viewing" ? "viewer" : "editor",
           document: { data: file, name, type: "docx" },
+          title: name,
           user: { name: user.name, email: user.email ?? "" },
-          ui: { toolbar: { container: toolbarRef.current }, search: true, comments: true, contextMenu: true },
-          uiDisplayFallbackFont: '"Figtree", "Inter", system-ui, sans-serif',
-          onReady: () => {
-            if (disposed) return;
-            // Load-time transactions fire editor updates; only count edits after the document settled.
-            setTimeout(() => {
-              readyRef.current = true;
-            }, 400);
-            setReady(true);
-            onReady?.();
+          ui: {
+            toolbar: { container: toolbarRef.current, responsiveTo: "container", overflow: "menu" },
+            loading: false,
+            search: true,
+            comments: true,
+            contextMenu: true,
           },
+          telemetry: { enabled: false },
+          disablePiniaDevtools: true,
+          uiDisplayFallbackFont: '"Figtree", "Inter", system-ui, sans-serif',
+          onReady: markReady,
           onEditorUpdate: () => {
             if (!disposed && readyRef.current) onDirty();
           },
@@ -91,6 +113,15 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           },
         } as unknown as ConstructorParameters<typeof SuperDoc>[0]);
         sdRef.current = instance;
+        if (import.meta.env.DEV) (window as unknown as { __mirzaDocx?: unknown }).__mirzaDocx = instance;
+        // Belt and braces: if the ready event is missed, detect a mounted document directly.
+        poll = setInterval(() => {
+          const sd = sdRef.current as unknown as { activeEditor?: { doc?: unknown } | null; state?: { documents?: { isReady?: boolean }[] } } | null;
+          if (sd?.activeEditor?.doc && sd.state?.documents?.[0]?.isReady) {
+            clearInterval(poll);
+            markReady();
+          }
+        }, 500);
       } catch (e) {
         console.error("[office:docx:init]", e);
         if (!disposed) setFailed(e instanceof Error ? e.message : "The editor couldn't start.");
@@ -98,6 +129,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
     })();
     return () => {
       disposed = true;
+      if (poll) clearInterval(poll);
       try {
         instance?.destroy();
       } catch {
@@ -147,26 +179,55 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           return "";
         }
       },
-      insert: async (text, how) => {
+      insert: async (text, how, anchor) => {
         const d = doc();
-        if (!d) return false;
-        const tracked = modeRef.current === "suggesting";
-        const opts = tracked ? { changeMode: "tracked" as const } : {};
+        if (!d) return { ok: false, reason: "The document isn't open yet." };
+        if (modeRef.current === "viewing") return { ok: false, reason: "Switch to Editing or Suggesting first — the document is in view-only mode." };
+        // AI text always lands as a tracked change so the attorney reviews a redline, never silent edits.
+        const opts = { changeMode: "tracked" as const };
+        const check = (receipt: unknown) => {
+          const r = receipt as { success?: boolean; failure?: { message?: string } } | undefined;
+          if (r && r.success === false) throw new Error(r.failure?.message || "The editor declined the change.");
+        };
         try {
           const s = await d.selection.current({ includeText: true } as never);
-          const target = s?.selectionTarget ?? s?.target ?? undefined;
-          if (how === "replace" && s && !s.empty && target) {
-            await d.replace({ target, text } as never, opts as never);
-          } else if (target) {
-            await d.insert({ target, value: text, type: "text" } as never, opts as never);
+          const live = s && !s.empty ? (s.selectionTarget ?? s.target ?? null) : null;
+          if (how === "replace") {
+            if (live) {
+              check(await d.replace({ target: live, text } as never, opts as never));
+              onDirty();
+              return { ok: true, tracked: true, how: "replace" };
+            }
+            // The selection was lost while the attorney worked in the panel: find the anchored passage again.
+            const needle = anchor?.trim();
+            if (!needle) return { ok: false, reason: "Select the passage to replace in the document first." };
+            const found = (await d.find({ select: { type: "text", pattern: needle, caseSensitive: true }, limit: 2 } as never)) as
+              | { total?: number; items?: { context?: { ancestors?: { id?: string }[] } }[] }
+              | undefined;
+            const refs = (found?.items ?? [])
+              .map((it) => it.context?.ancestors?.find((a) => String(a.id ?? "").startsWith("v2-text:"))?.id)
+              .filter((x): x is string => typeof x === "string");
+            if (refs.length === 0) return { ok: false, reason: "The passage you selected earlier is no longer in the document. Select the text to replace and try again." };
+            if ((found?.total ?? refs.length) > 1) return { ok: false, reason: "That passage appears more than once. Select the exact one to replace in the document." };
+            check(await d.replace({ ref: refs[0], text } as never, opts as never));
+            onDirty();
+            return { ok: true, tracked: true, how: "replace", detail: "Replaced the passage you selected when you asked." };
+          }
+          let target = (s?.selectionTarget ?? s?.target ?? null) as { kind?: string; start?: unknown; end?: unknown } | null;
+          if (target && !s?.empty && target.kind === "selection" && target.end) {
+            // "Insert" with text highlighted means insert after it, never over it: collapse to the end.
+            target = { ...target, start: target.end };
+          }
+          if (target) {
+            check(await d.insert({ target, value: text, type: "text" } as never, opts as never));
           } else {
-            await d.insert({ value: text, type: "text" } as never, opts as never);
+            check(await d.insert({ value: text, type: "text" } as never, opts as never));
           }
           onDirty();
-          return true;
+          return { ok: true, tracked: true, how: "cursor" };
         } catch (e) {
           console.error("[office:docx:insert]", e);
-          return false;
+          return { ok: false, reason: e instanceof Error ? e.message : "The editor couldn't apply that change." };
         }
       },
       export: async () => {
@@ -196,7 +257,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
 
   return (
     <div className="office-docx flex h-full min-h-0 flex-col">
-      <div ref={toolbarRef} className="shrink-0 border-b bg-card" aria-label="Formatting toolbar" />
+      <div ref={toolbarRef} className="min-w-0 shrink-0 overflow-hidden border-b bg-card" aria-label="Formatting toolbar" />
       <div className="relative min-h-0 flex-1 overflow-auto bg-raised">
         {!ready && !failed && (
           <div className="absolute inset-0 z-10 flex items-start justify-center bg-raised p-6">

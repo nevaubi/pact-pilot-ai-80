@@ -62,6 +62,7 @@ function OfficePage() {
   }, []);
 
   const editor = useRef<EditorHandle | null>(null);
+  const pathRef = useRef<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<DocMode>("editing");
@@ -94,6 +95,8 @@ function OfficePage() {
   const { file, blob } = fileQ.data;
   const kind = officeKind(file.name);
   const matter = file.matters as { id: string; title: string } | null;
+  // Each save writes a fresh object; keep the current path without remounting the editor.
+  const current = () => ({ ...file, path: pathRef.current ?? file.path });
 
   async function save() {
     if (!editor.current) return;
@@ -101,9 +104,11 @@ function OfficePage() {
     await tryAction(async () => {
       const out = await editor.current!.export();
       const text = kind === "pdf" ? undefined : (await editor.current!.getText()).slice(0, 300000) || null;
-      await saveNewVersion(file, out, { ...(text !== undefined ? { text } : {}), editedBy: user.id });
+      pathRef.current = await saveNewVersion(current(), out, { ...(text !== undefined ? { text } : {}), editedBy: user.id });
       setDirty(false);
       qc.invalidateQueries({ queryKey: ["file-versions", fileId] });
+      qc.invalidateQueries({ queryKey: ["files"] });
+      qc.invalidateQueries({ queryKey: ["files-hub"] });
       toast.success("Saved. The previous version is kept in history.");
     });
     setSaving(false);
@@ -121,7 +126,7 @@ function OfficePage() {
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-card px-3 py-1.5">
         <Button asChild size="icon" variant="ghost" className="h-7 w-7" aria-label="Back">
           {matter ? (
-            <Link to="/matters/$id" params={{ id: matter.id }} search={{ tab: "files" } as never}><ArrowLeft className="h-4 w-4" /></Link>
+            <Link to="/matters/$id" params={{ id: matter.id }} search={{ tab: "Files" } as never}><ArrowLeft className="h-4 w-4" /></Link>
           ) : (
             <Link to="/files"><ArrowLeft className="h-4 w-4" /></Link>
           )}
@@ -175,9 +180,10 @@ function OfficePage() {
                   {v.note && <span className="truncate text-muted-foreground">{v.note}</span>}
                   <span className="flex-1" />
                   <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => tryAction(async () => {
-                    await restoreVersion(file, v, user.id);
+                    await restoreVersion(current(), v, user.id);
+                    pathRef.current = null;
                     toast.success("Version restored.");
-                    qc.invalidateQueries({ queryKey: ["office-file", fileId] });
+                    await qc.invalidateQueries({ queryKey: ["office-file", fileId] });
                     qc.invalidateQueries({ queryKey: ["file-versions", fileId] });
                     setDirty(false);
                   })}>Restore</Button>
@@ -200,7 +206,7 @@ function OfficePage() {
         </div>
         {panel && matter && (
           <Suspense fallback={<div className="border-l" />}>
-            <DraftPanel matterId={matter.id} fileId={file.id} canInsert={kind === "docx" || kind === "xlsx"} getDoc={getDoc} editor={editor} />
+            <DraftPanel matterId={matter.id} fileId={file.id} kind={kind ?? "text"} canInsert={kind === "docx" || kind === "xlsx"} getDoc={getDoc} editor={editor} />
           </Suspense>
         )}
       </div>

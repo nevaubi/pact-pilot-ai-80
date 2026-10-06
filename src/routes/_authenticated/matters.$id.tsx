@@ -43,8 +43,9 @@ type Tab = (typeof TABS)[number];
 
 export const Route = createFileRoute("/_authenticated/matters/$id")({
   validateSearch: (s: Record<string, unknown>): { tab?: Tab } => {
-    const t = typeof s["tab"] === "string" ? (s["tab"] as Tab) : undefined;
-    return t && TABS.includes(t) && t !== "Overview" ? { tab: t } : {};
+    const raw = typeof s["tab"] === "string" ? s["tab"].toLowerCase() : undefined;
+    const t = raw ? TABS.find((x) => x.toLowerCase() === raw) : undefined;
+    return t && t !== "Overview" ? { tab: t } : {};
   },
   head: () => ({
     meta: [
