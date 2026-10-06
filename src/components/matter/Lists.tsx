@@ -220,6 +220,7 @@ function NoteCard({ note, onChanged }: { note: Tables<"notes">; onChanged: () =>
         <h3 className="text-sm font-semibold">
           {note.title ?? "Note"}
           {note.kind === "meeting" && <span className="ml-1.5 rounded bg-ink-teal/10 px-1.5 text-[10px] font-medium text-ink-teal">Meeting</span>}
+          {note.kind === "assist" && <span className="ml-1.5 rounded bg-ink-purple/10 px-1.5 text-[10px] font-medium text-ink-purple">from Assist</span>}
         </h3>
         <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground">{fmtDateTime(note.created_at)}</span>

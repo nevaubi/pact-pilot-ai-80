@@ -150,7 +150,7 @@ export const suggestTemplateAnswers = createServerFn({ method: "POST" })
       });
       const r = await aiObject(
         data.effort,
-        "Fill the blanks of the firm's house template using only facts in the matter (its summary, notes, contacts and documents). Never guess: leave value as an empty string when the matter does not say. Return one answer per blank, in the order given.",
+        "Fill the blanks of the firm's house template using only facts in the matter (its summary, notes, contacts and documents). Give each value exactly as it should read inside the blank — e.g. '$4,250,000', 'December 15, 2026', 'Brightwater Holdings LLC' — with no commentary, qualifiers or parentheticals. Never guess: leave value as an empty string when the matter does not say. Return one answer per blank, in the order given.",
         `${ctx}\n\nTEMPLATE BLANKS:\n${data.fields.map((f) => `- ${f}`).join("\n")}`,
         schema,
       );
