@@ -225,6 +225,9 @@ export async function xlsxToWorkbook(buf: ArrayBuffer, name: string): Promise<Wo
   const ExcelJS = await import("exceljs");
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf);
+  // Serials must use the workbook's own base date so values match what Excel stores (1904 vs 1900).
+  const date1904 = !!(wb.properties as { date1904?: boolean } | undefined)?.date1904;
+  const serial = (d: Date) => excelSerial(d, date1904);
   const styles: Record<string, StyleData> = {};
   const styleIds = new Map<string, string>();
   const styleId = (s: StyleData) => {
@@ -252,12 +255,14 @@ export async function xlsxToWorkbook(buf: ArrayBuffer, name: string): Promise<Wo
         const val = cell.value as unknown;
         if (cell.type === ExcelJS.ValueType.Formula) {
           const fv = cell.value as { formula?: string; result?: unknown; sharedFormula?: string };
-          if (fv.formula) cd.f = `=${fv.formula}`;
+          // Shared-formula children carry only a pointer to the master; `cell.formula` translates it.
+          const formula = fv.formula || (cell as unknown as { formula?: string }).formula;
+          if (formula) cd.f = `=${formula}`;
           const res = fv.result;
           if (typeof res === "number" || typeof res === "string" || typeof res === "boolean") cd.v = res;
-          else if (res instanceof Date) cd.v = excelSerial(res);
+          else if (res instanceof Date) cd.v = serial(res);
         } else if (val instanceof Date) {
-          cd.v = excelSerial(val);
+          cd.v = serial(val);
         } else if (val && typeof val === "object" && "richText" in (val as object)) {
           cd.v = (val as { richText: { text: string }[] }).richText.map((t) => t.text).join("");
         } else if (val && typeof val === "object" && "text" in (val as object)) {
@@ -418,6 +423,7 @@ function colIndex(letters: string) {
   for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
   return n - 1;
 }
-function excelSerial(d: Date) {
-  return Math.round(((d.getTime() - Date.UTC(1899, 11, 30)) / 86_400_000) * 1e6) / 1e6;
+export function excelSerial(d: Date, date1904 = false) {
+  const base = date1904 ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
+  return Math.round(((d.getTime() - base) / 86_400_000) * 1e6) / 1e6;
 }
