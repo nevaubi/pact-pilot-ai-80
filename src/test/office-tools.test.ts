@@ -1,10 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
-  LIMITS, publicQuery, rankedContext, readCells, readRange, searchLiteral, sheetOpValue, toBlocks,
-  validateSheetOps, validateWordEdits, ToolBudget,
+  LIMITS,
+  publicQuery,
+  rankedContext,
+  readCells,
+  readRange,
+  searchLiteral,
+  sheetOpValue,
+  toBlocks,
+  validateSheetOps,
+  validateWordEdits,
+  ToolBudget,
 } from "@/lib/office-tools";
 
-const filler = (n: number) => Array.from({ length: n }, (_, i) => `Clause ${i}. The parties agree to ordinary boilerplate number ${i}.`).join("\n");
+const filler = (n: number) =>
+  Array.from(
+    { length: n },
+    (_, i) => `Clause ${i}. The parties agree to ordinary boilerplate number ${i}.`,
+  ).join("\n");
 
 describe("document retrieval", () => {
   it("finds a passage in the middle of a large document (not just head/tail)", () => {
@@ -55,7 +68,15 @@ describe("document retrieval", () => {
 describe("word proposal validation", () => {
   const doc = "Seller shall deliver audited financial statements. Buyer pays. Buyer pays.";
   it("accepts a unique verbatim anchor", () => {
-    expect(validateWordEdits(doc, [{ op: "replace", find: "audited financial statements", replace: "reviewed financial statements" }]).ok).toBe(true);
+    expect(
+      validateWordEdits(doc, [
+        {
+          op: "replace",
+          find: "audited financial statements",
+          replace: "reviewed financial statements",
+        },
+      ]).ok,
+    ).toBe(true);
   });
   it("rejects missing, ambiguous, identical and overlapping anchors", () => {
     const v = validateWordEdits(doc, [
@@ -88,20 +109,33 @@ describe("sheet preflight", () => {
     expect(v.errors.length).toBe(6);
   });
   it("allows the max cell and preserves 00123 as literal text", () => {
-    expect(validateSheetOps(names, [{ sheet: "Deadlines", cell: "XFD1048576", type: "text", value: "00123" }]).ok).toBe(true);
+    expect(
+      validateSheetOps(names, [
+        { sheet: "Deadlines", cell: "XFD1048576", type: "text", value: "00123" },
+      ]).ok,
+    ).toBe(true);
     expect(sheetOpValue({ sheet: "D", cell: "A1", type: "text", value: "00123" })).toBe("00123");
     expect(sheetOpValue({ sheet: "D", cell: "A1", type: "number", value: "123" })).toBe(123);
   });
   it("reads cells with formulas within a range", () => {
-    const r = readCells({ sheets: [{ name: "S", cells: { A1: { v: 1 }, A2: { v: 3, f: "=A1*3" }, Z9: { v: 9 } } }] }, "S", "A1:B5");
-    expect("cells" in r && r.cells).toEqual([{ cell: "A1", v: 1 }, { cell: "A2", v: 3, f: "=A1*3" }]);
+    const r = readCells(
+      { sheets: [{ name: "S", cells: { A1: { v: 1 }, A2: { v: 3, f: "=A1*3" }, Z9: { v: 9 } } }] },
+      "S",
+      "A1:B5",
+    );
+    expect("cells" in r && r.cells).toEqual([
+      { cell: "A1", v: 1 },
+      { cell: "A2", v: 3, f: "=A1*3" },
+    ]);
     expect(readCells({ sheets: [] }, "X", "A1")).toHaveProperty("error");
   });
 });
 
 describe("public query hygiene", () => {
   it("strips emails, amounts, account numbers and long quotes", () => {
-    const q = publicQuery('bulk sales notice Illinois john@client.com $1,250,000 acct 123456789 "the seller shall indemnify the buyer for all losses"');
+    const q = publicQuery(
+      'bulk sales notice Illinois john@client.com $1,250,000 acct 123456789 "the seller shall indemnify the buyer for all losses"',
+    );
     expect(q).toBe("bulk sales notice Illinois acct");
   });
 });

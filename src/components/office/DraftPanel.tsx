@@ -18,7 +18,13 @@ import {
   X,
 } from "lucide-react";
 import { useEffort } from "@/hooks/use-effort";
-import { linkCitations, useAssist, type AttachmentPayload, type DocContext, type Turn } from "@/hooks/use-assist";
+import {
+  linkCitations,
+  useAssist,
+  type AttachmentPayload,
+  type DocContext,
+  type Turn,
+} from "@/hooks/use-assist";
 import { EffortToggle, UsageNote, ReviewBanner } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,32 +46,88 @@ type Props = {
   onClose?: () => void;
 };
 
-const QUICK: Record<"docx" | "xlsx" | "other", { label: string; prompt: string; needsSel?: boolean }[]> = {
+const QUICK: Record<
+  "docx" | "xlsx" | "other",
+  { label: string; prompt: string; needsSel?: boolean }[]
+> = {
   docx: [
-    { label: "Fill blanks", prompt: "Find each unfilled [[Field]] or {{Field}} blank and propose its value from the matter record or files as Word edits. Leave any blank you can't source; list those as 'Needs attorney input'. Do not invent values." },
-    { label: "Check deal terms", prompt: "Compare this document with the matter's deal terms, dates and parties. List only concrete mismatches, each with the verbatim document text and what the matter record says." },
-    { label: "Tighten selection", prompt: "Tighten the selected text without changing its legal meaning.", needsSel: true },
-    { label: "Explain selection", prompt: "Explain the selected clause in plain terms: what it does, who it favours, and anything customary that appears missing.", needsSel: true },
+    {
+      label: "Fill blanks",
+      prompt:
+        "Find each unfilled [[Field]] or {{Field}} blank and propose its value from the matter record or files as Word edits. Leave any blank you can't source; list those as 'Needs attorney input'. Do not invent values.",
+    },
+    {
+      label: "Check deal terms",
+      prompt:
+        "Compare this document with the matter's deal terms, dates and parties. List only concrete mismatches, each with the verbatim document text and what the matter record says.",
+    },
+    {
+      label: "Tighten selection",
+      prompt: "Tighten the selected text without changing its legal meaning.",
+      needsSel: true,
+    },
+    {
+      label: "Explain selection",
+      prompt:
+        "Explain the selected clause in plain terms: what it does, who it favours, and anything customary that appears missing.",
+      needsSel: true,
+    },
   ],
   xlsx: [
-    { label: "Check the math", prompt: "Review the formulas and totals. List any cell whose formula or value looks inconsistent with its label or neighbours, quoting the cell reference." },
-    { label: "Tie to matter", prompt: "Compare amounts and dates in this spreadsheet with the matter's deal terms and property record. List concrete mismatches with cell references." },
-    { label: "Add totals row", prompt: "Propose a totals row for the main table on the active sheet using SUM formulas, as a sheet proposal." },
+    {
+      label: "Check the math",
+      prompt:
+        "Review the formulas and totals. List any cell whose formula or value looks inconsistent with its label or neighbours, quoting the cell reference.",
+    },
+    {
+      label: "Tie to matter",
+      prompt:
+        "Compare amounts and dates in this spreadsheet with the matter's deal terms and property record. List concrete mismatches with cell references.",
+    },
+    {
+      label: "Add totals row",
+      prompt:
+        "Propose a totals row for the main table on the active sheet using SUM formulas, as a sheet proposal.",
+    },
   ],
   other: [
-    { label: "Summarize", prompt: "Summarize this document for the matter file in under 150 words: parties, purpose, key dates and amounts, open items. Quote dates and amounts exactly." },
-    { label: "Dates & deliverables", prompt: "List every date, deadline and deliverable in this document with the verbatim sentence it comes from." },
-    { label: "Check deal terms", prompt: "Compare this document with the matter's deal terms, dates and parties. List only concrete mismatches with the verbatim text." },
+    {
+      label: "Summarize",
+      prompt:
+        "Summarize this document for the matter file in under 150 words: parties, purpose, key dates and amounts, open items. Quote dates and amounts exactly.",
+    },
+    {
+      label: "Dates & deliverables",
+      prompt:
+        "List every date, deadline and deliverable in this document with the verbatim sentence it comes from.",
+    },
+    {
+      label: "Check deal terms",
+      prompt:
+        "Compare this document with the matter's deal terms, dates and parties. List only concrete mismatches with the verbatim text.",
+    },
   ],
 };
 
 type Attached = AttachmentPayload & { chars: number };
 
-function IconBtn(p: { label: string; onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+function IconBtn(p: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button size="icon" variant="ghost" className="h-7 w-7" aria-label={p.label} onClick={p.onClick} disabled={p.disabled}>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7"
+          aria-label={p.label}
+          onClick={p.onClick}
+          disabled={p.disabled}
+        >
           {p.children}
         </Button>
       </TooltipTrigger>
@@ -75,9 +137,23 @@ function IconBtn(p: { label: string; onClick: () => void; disabled?: boolean; ch
 }
 
 /** Drafting side panel: bounded tool-using assistant over the open file, matter files and attached references. */
-export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc, editor, onClose }: Props) {
+export function DraftPanel({
+  matterId,
+  fileId,
+  fileName,
+  kind,
+  canInsert,
+  getDoc,
+  editor,
+  onClose,
+}: Props) {
   const [effort, setEffort] = useEffort();
-  const { turns, busy, send, stop, clear, markApplied } = useAssist({ matterId, storeKey: `mirza-draft-${fileId}`, effort, mode: "draft" });
+  const { turns, busy, send, stop, clear, markApplied } = useAssist({
+    matterId,
+    storeKey: `mirza-draft-${fileId}`,
+    effort,
+    mode: "draft",
+  });
   const [q, setQ] = useState("");
   const [preparing, setPreparing] = useState(false);
   const [prepError, setPrepError] = useState<string | null>(null);
@@ -133,7 +209,8 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
       setPreparing(true);
       try {
         const doc = await getDoc();
-        if (kind === "xlsx" && editor.current?.getWorkbook) doc.workbook = await editor.current.getWorkbook();
+        if (kind === "xlsx" && editor.current?.getWorkbook)
+          doc.workbook = await editor.current.getWorkbook();
         if (o.needsSel && !doc.selection) {
           setPrepError("Select some text in the document first.");
           return false;
@@ -143,7 +220,12 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
           ...(o.label ? { label: o.label } : {}),
           ...(o.replaceId ? { replaceId: o.replaceId } : {}),
           document: doc,
-          attachments: attached.map(({ id, name, text, truncated }) => ({ id, name, text, truncated })),
+          attachments: attached.map(({ id, name, text, truncated }) => ({
+            id,
+            name,
+            text,
+            truncated,
+          })),
         });
       } catch (e) {
         logClientError(e, "ai", { stage: "draft-context", kind });
@@ -168,24 +250,36 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
     const { extractText } = await import("@/lib/extract");
     for (const f of Array.from(files)) {
       if (attached.length >= LIMITS.attachments) {
-        setPrepError(`At most ${LIMITS.attachments} references per conversation. Remove one first.`);
+        setPrepError(
+          `At most ${LIMITS.attachments} references per conversation. Remove one first.`,
+        );
         break;
       }
       if (f.size > LIMITS.attachmentBytes) {
-        setPrepError(`${f.name} is ${(f.size / 1048576).toFixed(1)} MB — the limit is ${LIMITS.attachmentBytes / 1048576} MB. Split it or add it to the matter's files.`);
+        setPrepError(
+          `${f.name} is ${(f.size / 1048576).toFixed(1)} MB — the limit is ${LIMITS.attachmentBytes / 1048576} MB. Split it or add it to the matter's files.`,
+        );
         continue;
       }
       setExtracting(f.name);
       try {
         const text = await extractText(f);
         if (!text.trim()) {
-          setPrepError(`${f.name} has no readable text (it may be scanned). Add it to the matter's Files and use "Read scanned text" there.`);
+          setPrepError(
+            `${f.name} has no readable text (it may be scanned). Add it to the matter's Files and use "Read scanned text" there.`,
+          );
           continue;
         }
         const truncated = text.length > LIMITS.attachmentChars;
         setAttached((a) => [
           ...a,
-          { id: `att${Date.now().toString(36)}${a.length}`, name: f.name, text: text.slice(0, LIMITS.attachmentChars), truncated, chars: text.length },
+          {
+            id: `att${Date.now().toString(36)}${a.length}`,
+            name: f.name,
+            text: text.slice(0, LIMITS.attachmentChars),
+            truncated,
+            chars: text.length,
+          },
         ]);
       } catch (e) {
         logClientError(e, "ai", { stage: "attach-extract" });
@@ -204,7 +298,19 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
       setApplying(turn.id);
       try {
         const r = await ed.insert(text.trim(), how, turn.anchor);
-        markApplied(turn.id, r.ok ? { state: "applied", note: r.detail ?? (r.how === "replace" ? "Replaced as a tracked change." : "Inserted as a tracked change.") } : { state: "failed", note: r.reason });
+        markApplied(
+          turn.id,
+          r.ok
+            ? {
+                state: "applied",
+                note:
+                  r.detail ??
+                  (r.how === "replace"
+                    ? "Replaced as a tracked change."
+                    : "Inserted as a tracked change."),
+              }
+            : { state: "failed", note: r.reason },
+        );
       } finally {
         setApplying(null);
       }
@@ -219,7 +325,10 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
       setApplying(turn.id);
       try {
         const r = await ed.applyProposal(p);
-        markApplied(turn.id, r.ok ? { state: "applied", note: r.detail } : { state: "failed", note: r.reason });
+        markApplied(
+          turn.id,
+          r.ok ? { state: "applied", note: r.detail } : { state: "failed", note: r.reason },
+        );
       } finally {
         setApplying(null);
       }
@@ -252,16 +361,35 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
             <span className="truncate text-foreground">{fileName}</span>
           </p>
           <p className="truncate" title={selection}>
-            {selection ? <>Selection: “{selection.slice(0, 80)}{selection.length > 80 ? "…" : ""}”</> : "No selection — requests use the whole file."}
+            {selection ? (
+              <>
+                Selection: “{selection.slice(0, 80)}
+                {selection.length > 80 ? "…" : ""}”
+              </>
+            ) : (
+              "No selection — requests use the whole file."
+            )}
           </p>
           {(attached.length > 0 || extracting) && (
             <ul className="flex flex-wrap gap-1 pt-0.5" aria-label="Attached references">
               {attached.map((a) => (
-                <li key={a.id} className="inline-flex max-w-full items-center gap-1 rounded-sm border bg-card px-1.5 py-0.5">
+                <li
+                  key={a.id}
+                  className="inline-flex max-w-full items-center gap-1 rounded-sm border bg-card px-1.5 py-0.5"
+                >
                   <Paperclip className="h-3 w-3 shrink-0" />
-                  <span className="truncate" title={a.name}>{a.name}</span>
-                  <span className="shrink-0">{Math.round(a.chars / 1000)}k{a.truncated ? `, first ${LIMITS.attachmentChars / 1000}k used` : ""}</span>
-                  <button aria-label={`Remove ${a.name}`} className="shrink-0 hover:text-foreground" onClick={() => setAttached((x) => x.filter((y) => y.id !== a.id))}>
+                  <span className="truncate" title={a.name}>
+                    {a.name}
+                  </span>
+                  <span className="shrink-0">
+                    {Math.round(a.chars / 1000)}k
+                    {a.truncated ? `, first ${LIMITS.attachmentChars / 1000}k used` : ""}
+                  </span>
+                  <button
+                    aria-label={`Remove ${a.name}`}
+                    className="shrink-0 hover:text-foreground"
+                    onClick={() => setAttached((x) => x.filter((y) => y.id !== a.id))}
+                  >
                     <X className="h-3 w-3" />
                   </button>
                 </li>
@@ -276,7 +404,12 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
         </div>
 
         <div className="relative min-h-0 flex-1">
-          <div ref={scrollRef} onScroll={onScroll} className="h-full space-y-4 overflow-y-auto p-3 text-sm" aria-live="polite">
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            className="h-full space-y-4 overflow-y-auto p-3 text-sm"
+            aria-live="polite"
+          >
             {!turns.length && (
               <div className="space-y-2">
                 <p className="text-xs leading-relaxed text-muted-foreground">
@@ -291,7 +424,12 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
                     <button
                       key={x.label}
                       disabled={busy || preparing}
-                      onClick={() => void ask(x.prompt, { label: x.label, ...(x.needsSel ? { needsSel: true } : {}) })}
+                      onClick={() =>
+                        void ask(x.prompt, {
+                          label: x.label,
+                          ...(x.needsSel ? { needsSel: true } : {}),
+                        })
+                      }
                       className="rounded-sm border bg-card px-2 py-1 text-xs hover:bg-raised disabled:opacity-50"
                     >
                       {x.label}
@@ -311,13 +449,23 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
                 canRetry={!busy && !preparing && t.id === lastId}
                 onPlace={place}
                 onApply={applyProposal}
-                onRetry={(turn) => void ask(turn.q, { replaceId: turn.id, ...(turn.label ? { label: turn.label } : {}) })}
+                onRetry={(turn) =>
+                  void ask(turn.q, {
+                    replaceId: turn.id,
+                    ...(turn.label ? { label: turn.label } : {}),
+                  })
+                }
               />
             ))}
             {turns.length > 0 && <ReviewBanner />}
           </div>
           {showJump && (
-            <Button size="sm" variant="secondary" className="absolute bottom-2 left-1/2 h-6 -translate-x-1/2 px-2 text-[11px] shadow-sm" onClick={jump}>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="absolute bottom-2 left-1/2 h-6 -translate-x-1/2 px-2 text-[11px] shadow-sm"
+              onClick={jump}
+            >
               <ArrowDown className="mr-1 h-3 w-3" /> Jump to latest
             </Button>
           )}
@@ -344,13 +492,24 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               // IME-safe: don't submit while composing (e.g. Japanese/Chinese input).
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+              if (
+                e.key === "Enter" &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                e.keyCode !== 229
+              ) {
                 e.preventDefault();
                 void submit();
               }
             }}
             rows={2}
-            placeholder={kind === "xlsx" ? "Ask about or change this spreadsheet…" : canInsert ? "Ask, or select text and describe the change…" : "Ask about this document…"}
+            placeholder={
+              kind === "xlsx"
+                ? "Ask about or change this spreadsheet…"
+                : canInsert
+                  ? "Ask, or select text and describe the change…"
+                  : "Ask about this document…"
+            }
             aria-label="Drafting request"
             className="resize-none text-sm"
           />
@@ -363,17 +522,32 @@ export function DraftPanel({ matterId, fileId, fileName, kind, canInsert, getDoc
               multiple
               onChange={(e) => void attach(e.target.files)}
             />
-            <IconBtn label="Attach reference (stays in this browser and this request)" onClick={() => fileInput.current?.click()} disabled={!!extracting || attached.length >= LIMITS.attachments}>
+            <IconBtn
+              label="Attach reference (stays in this browser and this request)"
+              onClick={() => fileInput.current?.click()}
+              disabled={!!extracting || attached.length >= LIMITS.attachments}
+            >
               <Paperclip className="h-3.5 w-3.5" />
             </IconBtn>
-            <span className="flex-1 text-[10px] text-muted-foreground">Enter to send · Shift+Enter for a new line</span>
+            <span className="flex-1 text-[10px] text-muted-foreground">
+              Enter to send · Shift+Enter for a new line
+            </span>
             {busy ? (
               <Button type="button" size="sm" variant="outline" className="h-7" onClick={stop}>
                 <Square className="mr-1 h-3 w-3" /> Stop
               </Button>
             ) : (
-              <Button type="submit" size="sm" className="h-7" disabled={!q.trim() || preparing || !!extracting}>
-                {preparing ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Send className="mr-1 h-3 w-3" />}
+              <Button
+                type="submit"
+                size="sm"
+                className="h-7"
+                disabled={!q.trim() || preparing || !!extracting}
+              >
+                {preparing ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Send className="mr-1 h-3 w-3" />
+                )}
                 {preparing ? "Preparing…" : "Send"}
               </Button>
             )}
@@ -400,7 +574,9 @@ const TurnView = memo(function TurnView(p: {
   const [showAct, setShowAct] = useState(false);
   const streaming = t.status === "streaming";
   const { proposal: fence, explanation } = splitDraft(t.a);
-  const { text, used } = streaming ? { text: explanation, used: [] } : linkCitations(explanation, t.sources);
+  const { text, used } = streaming
+    ? { text: explanation, used: [] }
+    : linkCitations(explanation, t.sources);
   const structured = t.proposal;
   const applied = t.apply?.state === "applied";
   const running = t.activity?.find((a) => a.status === "running");
@@ -415,15 +591,29 @@ const TurnView = memo(function TurnView(p: {
       )}
       {!!t.activity?.length && (
         <div className="text-[11px] text-muted-foreground">
-          <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => setShowAct((v) => !v)} aria-expanded={showAct}>
-            <ChevronRight className={`h-3 w-3 transition-transform ${showAct ? "rotate-90" : ""}`} />
-            {running ? running.label + "…" : `${t.activity.length} step${t.activity.length === 1 ? "" : "s"}${t.steps ? ` · ${t.steps} model round${t.steps === 1 ? "" : "s"}` : ""}`}
+          <button
+            className="inline-flex items-center gap-1 hover:text-foreground"
+            onClick={() => setShowAct((v) => !v)}
+            aria-expanded={showAct}
+          >
+            <ChevronRight
+              className={`h-3 w-3 transition-transform ${showAct ? "rotate-90" : ""}`}
+            />
+            {running
+              ? running.label + "…"
+              : `${t.activity.length} step${t.activity.length === 1 ? "" : "s"}${t.steps ? ` · ${t.steps} model round${t.steps === 1 ? "" : "s"}` : ""}`}
           </button>
           {showAct && (
             <ul className="mt-1 space-y-0.5 border-l pl-2">
               {t.activity.map((a) => (
                 <li key={a.id} className="flex items-center gap-1">
-                  {a.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : a.status === "done" ? <Check className="h-3 w-3" /> : <CircleAlert className="h-3 w-3 text-ink-red" />}
+                  {a.status === "running" ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : a.status === "done" ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <CircleAlert className="h-3 w-3 text-ink-red" />
+                  )}
                   {a.label}
                 </li>
               ))}
@@ -433,20 +623,47 @@ const TurnView = memo(function TurnView(p: {
       )}
       {text && (
         <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-li:my-0">
-          {streaming ? <p className="whitespace-pre-wrap">{text}</p> : <ReactMarkdown components={{ a: (a) => <a {...a} target="_blank" rel="noopener noreferrer" /> }}>{text}</ReactMarkdown>}
+          {streaming ? (
+            <p className="whitespace-pre-wrap">{text}</p>
+          ) : (
+            <ReactMarkdown
+              components={{ a: (a) => <a {...a} target="_blank" rel="noopener noreferrer" /> }}
+            >
+              {text}
+            </ReactMarkdown>
+          )}
         </div>
       )}
-      {streaming && !t.a && !running && <p className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Reading the file…</p>}
+      {streaming && !t.a && !running && (
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" /> Reading the file…
+        </p>
+      )}
 
-      {structured && <ProposalCard {...p} t={t} pr={structured.proposal} errors={structured.validation.ok ? [] : structured.validation.errors} />}
+      {structured && (
+        <ProposalCard
+          {...p}
+          t={t}
+          pr={structured.proposal}
+          errors={structured.validation.ok ? [] : structured.validation.errors}
+        />
+      )}
 
       {!structured && fence && (
         <div className="rounded-sm border">
           <div className="flex items-center justify-between border-b bg-raised px-2 py-1 text-[11px]">
-            <span className="font-medium uppercase tracking-wide">{kind === "xlsx" ? "Proposed cells" : "Proposed text"}</span>
-            <span className="text-muted-foreground">{t.anchor ? "Replaces the passage above" : "Inserts at cursor"}</span>
+            <span className="font-medium uppercase tracking-wide">
+              {kind === "xlsx" ? "Proposed cells" : "Proposed text"}
+            </span>
+            <span className="text-muted-foreground">
+              {t.anchor ? "Replaces the passage above" : "Inserts at cursor"}
+            </span>
           </div>
-          <pre className={`max-h-72 overflow-auto whitespace-pre-wrap px-2 py-1.5 text-xs leading-relaxed ${kind === "xlsx" ? "font-mono" : "font-sans"}`}>{fence}</pre>
+          <pre
+            className={`max-h-72 overflow-auto whitespace-pre-wrap px-2 py-1.5 text-xs leading-relaxed ${kind === "xlsx" ? "font-mono" : "font-sans"}`}
+          >
+            {fence}
+          </pre>
         </div>
       )}
 
@@ -458,14 +675,23 @@ const TurnView = memo(function TurnView(p: {
       )}
       {t.apply && (
         <p className={`text-xs ${applied ? "text-foreground" : "text-ink-red"}`} role="status">
-          {applied ? <Check className="mr-1 inline h-3 w-3" /> : <CircleAlert className="mr-1 inline h-3 w-3" />}
+          {applied ? (
+            <Check className="mr-1 inline h-3 w-3" />
+          ) : (
+            <CircleAlert className="mr-1 inline h-3 w-3" />
+          )}
           {t.apply.note}
         </p>
       )}
       {used.length > 0 && (
         <ul className="text-[11px] text-muted-foreground">
           {used.map((s) => (
-            <li key={s.ref}>[{s.ref}] <a className="underline" href={s.url} target="_blank" rel="noopener noreferrer">{s.citation}</a></li>
+            <li key={s.ref}>
+              [{s.ref}]{" "}
+              <a className="underline" href={s.url} target="_blank" rel="noopener noreferrer">
+                {s.citation}
+              </a>
+            </li>
           ))}
         </ul>
       )}
@@ -474,12 +700,24 @@ const TurnView = memo(function TurnView(p: {
           {t.status === "done" && <UsageNote effort={t.effort} usage={t.usage} />}
           <span className="flex-1" />
           {t.status !== "done" && t.retryable !== false && p.canRetry && (
-            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => p.onRetry(t)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs"
+              onClick={() => p.onRetry(t)}
+            >
               <RotateCcw className="mr-1 h-3 w-3" /> Retry
             </Button>
           )}
           {t.a && (
-            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => copyText((fence ?? t.a).trim(), fence ? "Proposed text copied" : "Copied")}>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs"
+              onClick={() =>
+                copyText((fence ?? t.a).trim(), fence ? "Proposed text copied" : "Copied")
+              }
+            >
               <Copy className="mr-1 h-3 w-3" /> Copy
             </Button>
           )}
@@ -488,10 +726,24 @@ const TurnView = memo(function TurnView(p: {
               size="sm"
               className="h-6 px-2 text-xs"
               disabled={p.anyApplying || applied}
-              onClick={() => p.onPlace(t, fence, kind === "xlsx" ? "cursor" : t.anchor ? "replace" : "cursor")}
+              onClick={() =>
+                p.onPlace(t, fence, kind === "xlsx" ? "cursor" : t.anchor ? "replace" : "cursor")
+              }
             >
-              {kind === "xlsx" ? null : t.anchor ? <Replace className="mr-1 h-3 w-3" /> : <CornerDownLeft className="mr-1 h-3 w-3" />}
-              {applied ? "Applied" : p.applying ? "Applying…" : kind === "xlsx" ? "Apply cells" : t.anchor ? "Replace" : "Insert"}
+              {kind === "xlsx" ? null : t.anchor ? (
+                <Replace className="mr-1 h-3 w-3" />
+              ) : (
+                <CornerDownLeft className="mr-1 h-3 w-3" />
+              )}
+              {applied
+                ? "Applied"
+                : p.applying
+                  ? "Applying…"
+                  : kind === "xlsx"
+                    ? "Apply cells"
+                    : t.anchor
+                      ? "Replace"
+                      : "Insert"}
             </Button>
           )}
         </div>
@@ -515,9 +767,15 @@ function ProposalCard(p: {
   return (
     <div className={`rounded-sm border ${valid ? "" : "border-ink-red/40"}`}>
       <div className="flex items-center gap-2 border-b bg-raised px-2 py-1 text-[11px]">
-        <span className="font-medium uppercase tracking-wide">{pr.kind === "word" ? `${pr.edits.length} proposed edit${pr.edits.length === 1 ? "" : "s"}` : `${pr.ops.length} cell${pr.ops.length === 1 ? "" : "s"}`}</span>
+        <span className="font-medium uppercase tracking-wide">
+          {pr.kind === "word"
+            ? `${pr.edits.length} proposed edit${pr.edits.length === 1 ? "" : "s"}`
+            : `${pr.ops.length} cell${pr.ops.length === 1 ? "" : "s"}`}
+        </span>
         <span className="flex-1 truncate text-muted-foreground">{pr.summary}</span>
-        <span className={valid ? "text-muted-foreground" : "text-ink-red"}>{valid ? "Checked" : "Didn't pass checks"}</span>
+        <span className={valid ? "text-muted-foreground" : "text-ink-red"}>
+          {valid ? "Checked" : "Didn't pass checks"}
+        </span>
       </div>
       <div className="max-h-80 overflow-auto text-xs">
         {pr.kind === "word" ? (
@@ -526,7 +784,9 @@ function ProposalCard(p: {
               <li key={i} className="space-y-1 px-2 py-1.5">
                 {e.op === "replace" ? (
                   <>
-                    <p className="whitespace-pre-wrap text-muted-foreground line-through decoration-ink-red/60">{e.find}</p>
+                    <p className="whitespace-pre-wrap text-muted-foreground line-through decoration-ink-red/60">
+                      {e.find}
+                    </p>
                     <p className="whitespace-pre-wrap">{e.replace}</p>
                   </>
                 ) : (
@@ -541,12 +801,18 @@ function ProposalCard(p: {
         ) : (
           <table className="w-full font-mono text-[11px]">
             <thead className="text-left text-muted-foreground">
-              <tr><th className="px-2 py-1 font-normal">Cell</th><th className="px-2 py-1 font-normal">Type</th><th className="px-2 py-1 font-normal">Value</th></tr>
+              <tr>
+                <th className="px-2 py-1 font-normal">Cell</th>
+                <th className="px-2 py-1 font-normal">Type</th>
+                <th className="px-2 py-1 font-normal">Value</th>
+              </tr>
             </thead>
             <tbody className="divide-y">
               {pr.ops.map((o, i) => (
                 <tr key={i}>
-                  <td className="whitespace-nowrap px-2 py-0.5">{o.sheet}!{o.cell}</td>
+                  <td className="whitespace-nowrap px-2 py-0.5">
+                    {o.sheet}!{o.cell}
+                  </td>
                   <td className="px-2 py-0.5 text-muted-foreground">{o.type}</td>
                   <td className="break-all px-2 py-0.5">{o.type === "clear" ? "—" : o.value}</td>
                 </tr>
@@ -557,7 +823,9 @@ function ProposalCard(p: {
       </div>
       {!valid && (
         <ul className="border-t px-2 py-1 text-[11px] text-ink-red">
-          {errors.slice(0, 6).map((e, i) => <li key={i}>{e}</li>)}
+          {errors.slice(0, 6).map((e, i) => (
+            <li key={i}>{e}</li>
+          ))}
         </ul>
       )}
       {p.canInsert && t.status === "done" && (
@@ -577,8 +845,23 @@ function ProposalCard(p: {
           >
             <Copy className="mr-1 h-3 w-3" /> Copy
           </Button>
-          <Button size="sm" className="h-6 px-2 text-xs" disabled={!valid || applied || p.anyApplying} onClick={() => p.onApply(t, pr)}>
-            {applied ? <><Check className="mr-1 h-3 w-3" /> Applied</> : p.applying ? "Applying…" : pr.kind === "word" ? "Apply as tracked changes" : "Apply cells"}
+          <Button
+            size="sm"
+            className="h-6 px-2 text-xs"
+            disabled={!valid || applied || p.anyApplying}
+            onClick={() => p.onApply(t, pr)}
+          >
+            {applied ? (
+              <>
+                <Check className="mr-1 h-3 w-3" /> Applied
+              </>
+            ) : p.applying ? (
+              "Applying…"
+            ) : pr.kind === "word" ? (
+              "Apply as tracked changes"
+            ) : (
+              "Apply cells"
+            )}
           </Button>
         </div>
       )}

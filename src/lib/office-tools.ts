@@ -46,7 +46,8 @@ export function toBlocks(text: string): Block[] {
   return out;
 }
 
-const HEADING = /^(?:(?:article|section|schedule|exhibit|part)\b|\d+(?:\.\d+)*[.)]?\s+[A-Z]|[A-Z][A-Z0-9 ,&'()-]{3,80}$)/i;
+const HEADING =
+  /^(?:(?:article|section|schedule|exhibit|part)\b|\d+(?:\.\d+)*[.)]?\s+[A-Z]|[A-Z][A-Z0-9 ,&'()-]{3,80}$)/i;
 
 /** Headings-like blocks (numbered sections, ARTICLE/Section lines, all-caps lines) with offsets. */
 export function outline(blocks: Block[], max = 80) {
@@ -59,7 +60,13 @@ export function outline(blocks: Block[], max = 80) {
 export function readRange(text: string, start: number, end: number) {
   const s = Math.max(0, Math.min(Math.floor(start), text.length));
   const e = Math.max(s, Math.min(Math.floor(end), text.length, s + LIMITS.readRangeChars));
-  return { start: s, end: e, text: text.slice(s, e), truncated: e < Math.min(end, text.length), length: text.length };
+  return {
+    start: s,
+    end: e,
+    text: text.slice(s, e),
+    truncated: e < Math.min(end, text.length),
+    length: text.length,
+  };
 }
 
 export type SearchHit = { start: number; end: number; snippet: string; blockId: string | null };
@@ -111,10 +118,16 @@ export function countLiteral(text: string, needle: string) {
 }
 
 const STOP = new Set(
-  "the a an and or of to in on for with by at from as is are be this that it its shall will may any all such into under per not no".split(" "),
+  "the a an and or of to in on for with by at from as is are be this that it its shall will may any all such into under per not no".split(
+    " ",
+  ),
 );
 export function terms(s: string) {
-  return [...new Set((s.toLowerCase().match(/[a-z0-9][a-z0-9'$.%-]{2,}/g) ?? []).filter((t) => !STOP.has(t)))].slice(0, 40);
+  return [
+    ...new Set(
+      (s.toLowerCase().match(/[a-z0-9][a-z0-9'$.%-]{2,}/g) ?? []).filter((t) => !STOP.has(t)),
+    ),
+  ].slice(0, 40);
 }
 
 /**
@@ -122,10 +135,24 @@ export function terms(s: string) {
  * blocks that best match the question — not just the head/tail. Reports exactly what is covered so
  * the model knows to use tools for the rest.
  */
-export function rankedContext(text: string, question: string, selection: string | undefined, budget: number) {
+export function rankedContext(
+  text: string,
+  question: string,
+  selection: string | undefined,
+  budget: number,
+) {
   const blocks = toBlocks(text);
   if (text.length <= budget)
-    return { excerpt: text, coverage: { included: text.length, total: text.length, complete: true, blocks: blocks.length }, blocks };
+    return {
+      excerpt: text,
+      coverage: {
+        included: text.length,
+        total: text.length,
+        complete: true,
+        blocks: blocks.length,
+      },
+      blocks,
+    };
   const chosen = new Set<number>();
   let used = 0;
   const take = (i: number) => {
@@ -166,7 +193,8 @@ export function rankedContext(text: string, question: string, selection: string 
   let prev = -2;
   for (const i of ordered) {
     const b = blocks[i]!;
-    if (i !== prev + 1) excerpt += `\n[… gap — use read_document_range/search_document; next block ${b.id} at offset ${b.start} …]\n`;
+    if (i !== prev + 1)
+      excerpt += `\n[… gap — use read_document_range/search_document; next block ${b.id} at offset ${b.start} …]\n`;
     excerpt += `[${b.id}@${b.start}] ${b.text}\n`;
     prev = i;
   }
@@ -180,7 +208,11 @@ export function rankedContext(text: string, question: string, selection: string 
 // ---------- spreadsheet ----------
 export type CellSnap = { v?: string | number | boolean | null; f?: string };
 export type SheetSnap = { name: string; cells: Record<string, CellSnap> };
-export type WorkbookSnap = { active?: string; selection?: { sheet: string; range: string }; sheets: SheetSnap[] };
+export type WorkbookSnap = {
+  active?: string;
+  selection?: { sheet: string; range: string };
+  sheets: SheetSnap[];
+};
 
 export function colToNum(col: string) {
   let n = 0;
@@ -210,12 +242,20 @@ export function parseRange(r: string) {
   const s = a ? parseA1(a) : null;
   const e = b ? parseA1(b) : s;
   if (!s || !e) return null;
-  return { r1: Math.min(s.row, e.row), r2: Math.max(s.row, e.row), c1: Math.min(s.col, e.col), c2: Math.max(s.col, e.col) };
+  return {
+    r1: Math.min(s.row, e.row),
+    r2: Math.max(s.row, e.row),
+    c1: Math.min(s.col, e.col),
+    c2: Math.max(s.col, e.col),
+  };
 }
 
 export function readCells(wb: WorkbookSnap, sheet: string, range: string) {
   const sh = wb.sheets.find((s) => s.name === sheet);
-  if (!sh) return { error: `No sheet named "${sheet}". Sheets: ${wb.sheets.map((s) => s.name).join(", ")}` };
+  if (!sh)
+    return {
+      error: `No sheet named "${sheet}". Sheets: ${wb.sheets.map((s) => s.name).join(", ")}`,
+    };
   const r = parseRange(range);
   if (!r) return { error: `"${range}" is not a valid A1 range inside Excel's grid.` };
   const cells: { cell: string; v: CellSnap["v"]; f?: string }[] = [];
@@ -246,7 +286,12 @@ export function sheetSummary(wb: WorkbookSnap) {
       maxC = Math.max(maxC, p.col);
       if (c.f) formulas++;
     }
-    return { name: s.name, used: maxR ? `A1:${numToCol(maxC)}${maxR}` : "empty", cells: Object.keys(s.cells).length, formulas };
+    return {
+      name: s.name,
+      used: maxR ? `A1:${numToCol(maxC)}${maxR}` : "empty",
+      cells: Object.keys(s.cells).length,
+      formulas,
+    };
   });
 }
 
@@ -274,19 +319,23 @@ export type Validation = { ok: boolean; errors: string[] };
 export function validateWordEdits(docText: string, edits: WordEdit[]): Validation {
   const errors: string[] = [];
   if (!edits.length) errors.push("No edits.");
-  if (edits.length > LIMITS.wordEdits) errors.push(`At most ${LIMITS.wordEdits} edits per proposal.`);
+  if (edits.length > LIMITS.wordEdits)
+    errors.push(`At most ${LIMITS.wordEdits} edits per proposal.`);
   const spans: [number, number, number][] = [];
   edits.forEach((e, i) => {
     const target = e.op === "replace" ? e.find : e.anchor;
     const body = e.op === "replace" ? e.replace : e.text;
     const n = i + 1;
     if (!target.trim()) return void errors.push(`Edit ${n}: empty anchor.`);
-    if (target.length > 4000) return void errors.push(`Edit ${n}: anchor longer than 4000 characters.`);
+    if (target.length > 4000)
+      return void errors.push(`Edit ${n}: anchor longer than 4000 characters.`);
     if (e.op === "insert_after" && !body.trim()) errors.push(`Edit ${n}: nothing to insert.`);
-    if (e.op === "replace" && body === target) errors.push(`Edit ${n}: replacement is identical to the original.`);
+    if (e.op === "replace" && body === target)
+      errors.push(`Edit ${n}: replacement is identical to the original.`);
     const c = countLiteral(docText, target);
     if (c === 0) errors.push(`Edit ${n}: anchor text not found verbatim in the document.`);
-    else if (c > 1) errors.push(`Edit ${n}: anchor occurs ${c} times — extend it until it is unique.`);
+    else if (c > 1)
+      errors.push(`Edit ${n}: anchor occurs ${c} times — extend it until it is unique.`);
     else {
       const at = docText.indexOf(target);
       spans.push([at, at + target.length, n]);
@@ -294,7 +343,8 @@ export function validateWordEdits(docText: string, edits: WordEdit[]): Validatio
   });
   spans.sort((a, b) => a[0] - b[0]);
   for (let i = 1; i < spans.length; i++)
-    if (spans[i]![0] < spans[i - 1]![1]) errors.push(`Edits ${spans[i - 1]![2]} and ${spans[i]![2]} overlap.`);
+    if (spans[i]![0] < spans[i - 1]![1])
+      errors.push(`Edits ${spans[i - 1]![2]} and ${spans[i]![2]} overlap.`);
   return { ok: errors.length === 0, errors };
 }
 
@@ -316,9 +366,12 @@ export function validateSheetOps(sheetNames: string[], ops: SheetOp[]): Validati
     }
     if (o.type === "number" && !/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(o.value.trim()))
       errors.push(`${n}: "${o.value}" is not a plain number (no currency symbols or commas).`);
-    if (o.type === "formula" && !o.value.startsWith("=")) errors.push(`${n}: formula must start with "=".`);
-    if (o.type === "boolean" && !/^(true|false)$/i.test(o.value)) errors.push(`${n}: boolean must be TRUE or FALSE.`);
-    if (o.value.length > 32_767) errors.push(`${n}: longer than Excel's 32,767-character cell limit.`);
+    if (o.type === "formula" && !o.value.startsWith("="))
+      errors.push(`${n}: formula must start with "=".`);
+    if (o.type === "boolean" && !/^(true|false)$/i.test(o.value))
+      errors.push(`${n}: boolean must be TRUE or FALSE.`);
+    if (o.value.length > 32_767)
+      errors.push(`${n}: longer than Excel's 32,767-character cell limit.`);
   });
   return { ok: errors.length === 0, errors };
 }
@@ -359,7 +412,8 @@ export class ToolBudget {
   /** Clip a serialised tool result to what remains; marks clipping so the model knows. */
   take(s: string) {
     const left = this.total - this.used;
-    if (left <= 0) return '{"error":"Tool output budget for this request is used up. Answer from what you have read."}';
+    if (left <= 0)
+      return '{"error":"Tool output budget for this request is used up. Answer from what you have read."}';
     const out = s.length > left ? `${s.slice(0, left)}… [clipped: tool budget reached]` : s;
     this.used += out.length;
     return out;

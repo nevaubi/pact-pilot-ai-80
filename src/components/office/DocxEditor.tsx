@@ -3,7 +3,13 @@ import type { SuperDoc as SuperDocType } from "superdoc";
 import "superdoc/style.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { logClientError } from "@/lib/error-log";
-import { applyWordEdits, resolveReplaceTarget, type ApplyResult, type MatchTarget, type WordEngine } from "@/lib/office-apply";
+import {
+  applyWordEdits,
+  resolveReplaceTarget,
+  type ApplyResult,
+  type MatchTarget,
+  type WordEngine,
+} from "@/lib/office-apply";
 import type { Proposal } from "@/lib/office-tools";
 
 export type DocMode = "editing" | "suggesting" | "viewing";
@@ -53,13 +59,17 @@ const TRACKED = { changeMode: "tracked" } as const;
 
 function receipt(r: unknown): { success: boolean; message?: string } {
   const x = r as { success?: boolean; failure?: { message?: string } } | undefined;
-  return x && x.success === false ? { success: false, message: x.failure?.message || "The editor declined the change." } : { success: true };
+  return x && x.success === false
+    ? { success: false, message: x.failure?.message || "The editor declined the change." }
+    : { success: true };
 }
 
 function plainError(e: unknown) {
   const m = e instanceof Error ? e.message : "";
-  if (/no change/i.test(m)) return "The proposal is identical to the text it would replace — nothing to change.";
-  if (/read[- ]?only|viewing/i.test(m)) return "The document is in view-only mode. Switch to Editing or Suggesting first.";
+  if (/no change/i.test(m))
+    return "The proposal is identical to the text it would replace — nothing to change.";
+  if (/read[- ]?only|viewing/i.test(m))
+    return "The document is in view-only mode. Switch to Editing or Suggesting first.";
   return m || "The editor couldn't apply that change.";
 }
 
@@ -75,13 +85,20 @@ function wordEngine(d: DocApi): WordEngine {
     },
     selection: async () => {
       const s = (await d.selection.current({ includeText: true } as never)) as
-        | { empty?: boolean; text?: string; target?: MatchTarget | null; selectionTarget?: MatchTarget | null }
+        | {
+            empty?: boolean;
+            text?: string;
+            target?: MatchTarget | null;
+            selectionTarget?: MatchTarget | null;
+          }
         | undefined;
-      if (!s || s.empty) return { text: "", target: (s?.selectionTarget ?? s?.target) ?? null };
+      if (!s || s.empty) return { text: "", target: s?.selectionTarget ?? s?.target ?? null };
       return { text: s.text ?? "", target: s.selectionTarget ?? s.target ?? null };
     },
-    replace: async (target, text) => receipt(await d.replace({ target, text } as never, TRACKED as never)),
-    insertAt: async (target, text) => receipt(await d.insert({ target, value: text, type: "text" } as never, TRACKED as never)),
+    replace: async (target, text) =>
+      receipt(await d.replace({ target, text } as never, TRACKED as never)),
+    insertAt: async (target, text) =>
+      receipt(await d.insert({ target, value: text, type: "text" } as never, TRACKED as never)),
   };
 }
 
@@ -244,7 +261,10 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
         const d = doc();
         if (!d) return { ok: false, reason: "The document isn't open yet." };
         if (modeRef.current === "viewing")
-          return { ok: false, reason: "Switch to Editing or Suggesting first — the document is in view-only mode." };
+          return {
+            ok: false,
+            reason: "Switch to Editing or Suggesting first — the document is in view-only mode.",
+          };
         const eng = wordEngine(d);
         try {
           if (how === "replace") {
@@ -252,9 +272,15 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
             const t = await resolveReplaceTarget(eng, anchor);
             if ("reason" in t) return { ok: false, reason: t.reason };
             const r = await eng.replace(t.target, text);
-            if (!r.success) return { ok: false, reason: r.message ?? "The editor declined the change." };
+            if (!r.success)
+              return { ok: false, reason: r.message ?? "The editor declined the change." };
             onDirty();
-            return { ok: true, tracked: true, how: "replace", detail: "Replaced the passage you selected when you asked." };
+            return {
+              ok: true,
+              tracked: true,
+              how: "replace",
+              detail: "Replaced the passage you selected when you asked.",
+            };
           }
           const s = await eng.selection();
           let target = s.target;
@@ -263,20 +289,29 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           const r = target
             ? await eng.insertAt(target, text)
             : receipt(await d.insert({ value: text, type: "text" } as never, TRACKED as never));
-          if (!r.success) return { ok: false, reason: r.message ?? "The editor declined the change." };
+          if (!r.success)
+            return { ok: false, reason: r.message ?? "The editor declined the change." };
           onDirty();
           return { ok: true, tracked: true, how: "cursor" };
         } catch (e) {
-          logClientError(e, "office", { kind: "docx", stage: how === "replace" ? "replace" : "insert" });
+          logClientError(e, "office", {
+            kind: "docx",
+            stage: how === "replace" ? "replace" : "insert",
+          });
           return { ok: false, reason: plainError(e) };
         }
       },
       applyProposal: async (p) => {
         const d = doc();
         if (!d) return { ok: false, reason: "The document isn't open yet.", applied: 0 };
-        if (p.kind !== "word") return { ok: false, reason: "That proposal is for a spreadsheet.", applied: 0 };
+        if (p.kind !== "word")
+          return { ok: false, reason: "That proposal is for a spreadsheet.", applied: 0 };
         if (modeRef.current === "viewing")
-          return { ok: false, reason: "Switch to Editing or Suggesting first — the document is in view-only mode.", applied: 0 };
+          return {
+            ok: false,
+            reason: "Switch to Editing or Suggesting first — the document is in view-only mode.",
+            applied: 0,
+          };
         try {
           const r = await applyWordEdits(wordEngine(d), p.edits);
           if (r.applied) onDirty();

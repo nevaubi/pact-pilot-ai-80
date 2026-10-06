@@ -34,7 +34,9 @@ const bodyZ = z.object({
                 cells: z.record(
                   z.string().max(12),
                   z.object({
-                    v: z.union([z.string().max(32_767), z.number(), z.boolean(), z.null()]).optional(),
+                    v: z
+                      .union([z.string().max(32_767), z.number(), z.boolean(), z.null()])
+                      .optional(),
                     f: z.string().max(8_192).optional(),
                   }),
                 ),
@@ -47,7 +49,14 @@ const bodyZ = z.object({
     .optional(),
   /** Reference documents attached in the drafting panel for this request only (extracted in the browser). */
   attachments: z
-    .array(z.object({ id: z.string().max(64), name: z.string().max(300), text: z.string().max(200_000), truncated: z.boolean() }))
+    .array(
+      z.object({
+        id: z.string().max(64),
+        name: z.string().max(300),
+        text: z.string().max(200_000),
+        truncated: z.boolean(),
+      }),
+    )
     .max(5)
     .optional(),
 });
@@ -60,8 +69,15 @@ export const Route = createFileRoute("/api/assist")({
     handlers: {
       POST: async ({ request }) => {
         const { authFromRequest } = await import("@/lib/auth.server");
-        const { aiStream, matterContext, askInstructions, logRun, toAiError, matterSources, queriesFromText } =
-          await import("@/lib/ai.server");
+        const {
+          aiStream,
+          matterContext,
+          askInstructions,
+          logRun,
+          toAiError,
+          matterSources,
+          queriesFromText,
+        } = await import("@/lib/ai.server");
 
         const auth = await authFromRequest(request).catch(() => null);
         if (!auth) return Response.json({ message: "Please sign in again." }, { status: 401 });
@@ -86,9 +102,23 @@ export const Route = createFileRoute("/api/assist")({
           );
         }
         // Library grounding: pinned sources first, then the practice area's topic. Never fatal.
-        const sources = await matterSources(auth.supabase, matterId, undefined, queriesFromText(`${question} ${doc?.selection ?? ""}`), effort).catch(
-          () => ({ block: "", meta: [] as { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null }[] }),
-        );
+        const sources = await matterSources(
+          auth.supabase,
+          matterId,
+          undefined,
+          queriesFromText(`${question} ${doc?.selection ?? ""}`),
+          effort,
+        ).catch(() => ({
+          block: "",
+          meta: [] as {
+            ref: string;
+            authority_id: string;
+            citation: string;
+            title: string;
+            url: string;
+            version: string | null;
+          }[],
+        }));
 
         let docBlock = "";
         if (doc) {
@@ -99,7 +129,13 @@ export const Route = createFileRoute("/api/assist")({
             // Keep the start (definitions, parties) and a window around the selection when there is one.
             const head = text.slice(0, Math.floor(budget * 0.6));
             const at = sel ? text.indexOf(sel.slice(0, 200)) : -1;
-            const tail = at > head.length ? text.slice(Math.max(head.length, at - Math.floor(budget * 0.1)), at + Math.floor(budget * 0.3)) : text.slice(-Math.floor(budget * 0.4));
+            const tail =
+              at > head.length
+                ? text.slice(
+                    Math.max(head.length, at - Math.floor(budget * 0.1)),
+                    at + Math.floor(budget * 0.3),
+                  )
+                : text.slice(-Math.floor(budget * 0.4));
             text = `${head}\n[… ${text.length - head.length - tail.length} characters omitted …]\n${tail}`;
           }
           docBlock = `\n\nOPEN DOCUMENT (${doc.kind}): ${doc.name}\n${text || "[no readable text]"}${sel ? `\n\nSELECTION:\n${sel}` : ""}`;

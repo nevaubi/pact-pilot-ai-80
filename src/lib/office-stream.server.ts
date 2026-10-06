@@ -3,7 +3,13 @@
 //         | done {usage,runId,steps,toolChars} | error {message,retryable}
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { ToolBudget, LIMITS, type Proposal, type Validation, type WorkbookSnap } from "./office-tools";
+import {
+  ToolBudget,
+  LIMITS,
+  type Proposal,
+  type Validation,
+  type WorkbookSnap,
+} from "./office-tools";
 import {
   AGENT_LIMITS,
   activityLabel,
@@ -38,14 +44,32 @@ function anySignal(signals: AbortSignal[]) {
   return c.signal;
 }
 
-export async function draftResponse(o: { auth: { supabase: SupabaseClient<Database>; userId: string }; body: Body; request: Request }) {
+export async function draftResponse(o: {
+  auth: { supabase: SupabaseClient<Database>; userId: string };
+  body: Body;
+  request: Request;
+}) {
   const { auth, body, request } = o;
-  const { provider, opts, BASE_INSTRUCTIONS, matterContext, matterSources, queriesFromText, logRun, toAiError } = await import("./ai.server");
-  const { searchEcfr, searchFederalRegister, searchCourtListener } = await import("./library.server");
+  const {
+    provider,
+    opts,
+    BASE_INSTRUCTIONS,
+    matterContext,
+    matterSources,
+    queriesFromText,
+    logRun,
+    toAiError,
+  } = await import("./ai.server");
+  const { searchEcfr, searchFederalRegister, searchCourtListener } =
+    await import("./library.server");
   const { effort, matterId, question } = body;
   const lim = AGENT_LIMITS[effort];
   const doc: OfficeDoc | undefined = body.document
-    ? { ...body.document, text: body.document.text.slice(0, LIMITS.docChars), workbook: body.document.workbook as WorkbookSnap | undefined }
+    ? {
+        ...body.document,
+        text: body.document.text.slice(0, LIMITS.docChars),
+        workbook: body.document.workbook as WorkbookSnap | undefined,
+      }
     : undefined;
   // Attachments: per-request only, already bounded by the route schema; total capped here too.
   let left: number = LIMITS.attachmentsTotalChars;
@@ -59,15 +83,35 @@ export async function draftResponse(o: { auth: { supabase: SupabaseClient<Databa
   try {
     ctx = await matterContext(auth.supabase, matterId, effort, false);
   } catch (e) {
-    return Response.json({ message: e instanceof Error ? e.message : "Matter not found" }, { status: 404 });
+    return Response.json(
+      { message: e instanceof Error ? e.message : "Matter not found" },
+      { status: 404 },
+    );
   }
-  const sources = await matterSources(auth.supabase, matterId, undefined, queriesFromText(`${question} ${doc?.selection ?? ""}`), effort).catch(
-    () => ({ block: "", meta: [] as { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null }[] }),
-  );
+  const sources = await matterSources(
+    auth.supabase,
+    matterId,
+    undefined,
+    queriesFromText(`${question} ${doc?.selection ?? ""}`),
+    effort,
+  ).catch(() => ({
+    block: "",
+    meta: [] as {
+      ref: string;
+      authority_id: string;
+      citation: string;
+      title: string;
+      url: string;
+      version: string | null;
+    }[],
+  }));
 
   const internal = new AbortController();
   const overall = new AbortController();
-  const overallTimer = setTimeout(() => overall.abort(new Error("overall deadline")), lim.overallMs);
+  const overallTimer = setTimeout(
+    () => overall.abort(new Error("overall deadline")),
+    lim.overallMs,
+  );
   const signal = anySignal([request.signal, internal.signal, overall.signal]);
 
   const proposals: { proposal: Proposal; validation: Validation }[] = [];
@@ -80,8 +124,21 @@ export async function draftResponse(o: { auth: { supabase: SupabaseClient<Databa
     budget: new ToolBudget(lim.toolChars),
     signal,
     publicSearch: async (q) => {
-      const r = await Promise.allSettled([searchEcfr(q), searchFederalRegister(q), searchCourtListener(q)]);
-      return r.flatMap((x) => (x.status === "fulfilled" ? x.value : [])).map(({ provider: p, citation, title, url, snippet, date }) => ({ provider: p, citation, title, url, snippet, date }));
+      const r = await Promise.allSettled([
+        searchEcfr(q),
+        searchFederalRegister(q),
+        searchCourtListener(q),
+      ]);
+      return r
+        .flatMap((x) => (x.status === "fulfilled" ? x.value : []))
+        .map(({ provider: p, citation, title, url, snippet, date }) => ({
+          provider: p,
+          citation,
+          title,
+          url,
+          snippet,
+          date,
+        }));
     },
     onProposal: (proposal, validation) => {
       proposals.push({ proposal, validation });
@@ -96,7 +153,8 @@ export async function draftResponse(o: { auth: { supabase: SupabaseClient<Databa
     : "";
   const prompt = `${ctx}\n\n${dp.block}${attachList}\n\n${sources.block}\n\nATTORNEY REQUEST:\n${question}`;
   const messages: { role: "user" | "assistant"; content: string }[] = [];
-  for (const t of body.history ?? []) messages.push({ role: "user", content: t.q }, { role: "assistant", content: t.a });
+  for (const t of body.history ?? [])
+    messages.push({ role: "user", content: t.q }, { role: "assistant", content: t.a });
   messages.push({ role: "user", content: prompt });
 
   const p = provider(body.runId);
@@ -104,7 +162,10 @@ export async function draftResponse(o: { auth: { supabase: SupabaseClient<Databa
     clearTimeout(overallTimer);
     const err = toAiError(e);
     if (err.status !== 499) console.error("[ai:draft]", err.status ?? "", err.message);
-    return Response.json({ message: err.message, retryable: err.retryable }, { status: err.status && err.status >= 400 ? err.status : 500 });
+    return Response.json(
+      { message: err.message, retryable: err.retryable },
+      { status: err.status && err.status >= 400 ? err.status : 500 },
+    );
   };
   let result: ReturnType<typeof runOfficeAgent>;
   try {
@@ -157,17 +218,34 @@ export async function draftResponse(o: { auth: { supabase: SupabaseClient<Databa
             emit({ t: "delta", text: part.text });
           } else if (part.type === "start-step") steps++;
           else if (part.type === "tool-call")
-            emit({ t: "activity", id: part.toolCallId, label: activityLabel(part.toolName, part.input), status: "running" });
+            emit({
+              t: "activity",
+              id: part.toolCallId,
+              label: activityLabel(part.toolName, part.input),
+              status: "running",
+            });
           else if (part.type === "tool-result") {
             const out = typeof part.output === "string" ? part.output : "";
-            emit({ t: "activity", id: part.toolCallId, status: out.startsWith('{"error"') ? "error" : "done" });
-          } else if (part.type === "tool-error") emit({ t: "activity", id: part.toolCallId, status: "error" });
+            emit({
+              t: "activity",
+              id: part.toolCallId,
+              status: out.startsWith('{"error"') ? "error" : "done",
+            });
+          } else if (part.type === "tool-error")
+            emit({ t: "activity", id: part.toolCallId, status: "error" });
           else if (part.type === "error") throw part.error;
           cur = await it.next();
         }
-        if (capped) emit({ t: "notice", text: `Answer stopped at the ${effort} length limit. Ask a narrower question or use Advanced.` });
+        if (capped)
+          emit({
+            t: "notice",
+            text: `Answer stopped at the ${effort} length limit. Ask a narrower question or use Advanced.`,
+          });
         const usage = await result.totalUsage.then(
-          (u) => ({ inputTokens: u.inputTokens ?? undefined, outputTokens: u.outputTokens ?? undefined }),
+          (u) => ({
+            inputTokens: u.inputTokens ?? undefined,
+            outputTokens: u.outputTokens ?? undefined,
+          }),
           () => ({ inputTokens: undefined, outputTokens: undefined }),
         );
         await logRun(auth.supabase, auth.userId, matterId, "draft", effort, usage);
@@ -175,10 +253,13 @@ export async function draftResponse(o: { auth: { supabase: SupabaseClient<Databa
       } catch (e) {
         const timedOut = overall.signal.aborted;
         const err = toAiError(e);
-        if (err.status !== 499 || timedOut) console.error("[ai:draft:stream]", err.status ?? "", err.message);
+        if (err.status !== 499 || timedOut)
+          console.error("[ai:draft:stream]", err.status ?? "", err.message);
         emit({
           t: "error",
-          message: timedOut ? `The assistant hit its ${lim.overallMs / 1000}s time limit. Partial work is kept.` : err.message,
+          message: timedOut
+            ? `The assistant hit its ${lim.overallMs / 1000}s time limit. Partial work is kept.`
+            : err.message,
           retryable: timedOut || err.retryable,
         });
       } finally {

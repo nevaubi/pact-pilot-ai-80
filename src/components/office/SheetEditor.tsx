@@ -8,7 +8,11 @@ import { applySheetOps, type SheetEngine } from "@/lib/office-apply";
 import { LIMITS, numToCol, type SheetOp, type WorkbookSnap } from "@/lib/office-tools";
 
 /** Values + formulas per sheet for the assistant's read_cells tool (bounded). */
-export function workbookSnapshot(data: WorkbookData, active?: string, selection?: { sheet: string; range: string }): WorkbookSnap {
+export function workbookSnapshot(
+  data: WorkbookData,
+  active?: string,
+  selection?: { sheet: string; range: string },
+): WorkbookSnap {
   let budget: number = LIMITS.sheetCells;
   const sheets = data.sheetOrder.map((id) => {
     const sh = data.sheets[id]!;
@@ -18,7 +22,10 @@ export function workbookSnapshot(data: WorkbookData, active?: string, selection?
         const cd = cell as { v?: string | number | boolean | null; f?: string };
         if (budget <= 0 || (cd.v == null && !cd.f)) continue;
         budget--;
-        cells[`${numToCol(Number(c) + 1)}${Number(r) + 1}`] = { ...(cd.v != null ? { v: typeof cd.v === "string" ? cd.v.slice(0, 2000) : cd.v } : {}), ...(cd.f ? { f: cd.f } : {}) };
+        cells[`${numToCol(Number(c) + 1)}${Number(r) + 1}`] = {
+          ...(cd.v != null ? { v: typeof cd.v === "string" ? cd.v.slice(0, 2000) : cd.v } : {}),
+          ...(cd.f ? { f: cd.f } : {}),
+        };
       }
     return { name: sh.name, cells };
   });
@@ -98,14 +105,20 @@ function engine(wb: Wb): SheetEngine {
       const r = range(sheet, cell);
       if (op.kind === "formula") r.setFormula(op.formula);
       // Literal text that looks numeric (e.g. 00123) is written as a string cell so Univer can't coerce it.
-      else if (typeof op.value === "string" && /^[-+]?[\d.,]+(e[+-]?\d+)?%?$/i.test(op.value.trim()))
+      else if (
+        typeof op.value === "string" &&
+        /^[-+]?[\d.,]+(e[+-]?\d+)?%?$/i.test(op.value.trim())
+      )
         r.setValue({ v: op.value, t: 1 } as never);
       else r.setValue(op.value);
     },
     read: (sheet, cell) => {
       const r = range(sheet, cell);
       const f = r.getFormula?.() ?? "";
-      return { value: r.getValue ? r.getValue() : (r.getValues()[0]?.[0] ?? null), formula: f || null };
+      return {
+        value: r.getValue ? r.getValue() : (r.getValues()[0]?.[0] ?? null),
+        formula: f || null,
+      };
     },
   };
 }
@@ -185,7 +198,9 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
           if (!r || !sheet) return "";
           // A single selected cell is a real target too — include it.
           const v = r.getValues() ?? [];
-          const grid = v.map((row) => row.map((c) => (c == null ? "" : String(c))).join("\t")).join("\n");
+          const grid = v
+            .map((row) => row.map((c) => (c == null ? "" : String(c))).join("\t"))
+            .join("\n");
           const f = v.length === 1 && v[0]?.length === 1 ? r.getFormula?.() : "";
           return `Selected ${r.getA1Notation()} on sheet "${sheet.getSheetName()}":\n${grid}${f ? `\nFormula: ${f}` : ""}`;
         } catch {
@@ -210,7 +225,11 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
         if (!wb) return { ok: false, reason: "The spreadsheet isn't open yet." };
         const ops = assignmentsToOps(text, wb.getActiveSheet().getSheetName());
         // Free text is never written into a cell; only explicit cell assignments are applied.
-        if (!ops.length) return { ok: false, reason: "No cell assignments to apply (expected lines like B12 = =SUM(B2:B11))." };
+        if (!ops.length)
+          return {
+            ok: false,
+            reason: "No cell assignments to apply (expected lines like B12 = =SUM(B2:B11)).",
+          };
         const r = applySheetOps(engine(wb), ops);
         if (!r.ok) return { ok: false, reason: r.reason };
         onDirty();
@@ -219,14 +238,19 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
       applyProposal: async (p) => {
         const wb = apiRef.current?.getActiveWorkbook();
         if (!wb) return { ok: false, reason: "The spreadsheet isn't open yet.", applied: 0 };
-        if (p.kind !== "sheet") return { ok: false, reason: "That proposal is for a Word document.", applied: 0 };
+        if (p.kind !== "sheet")
+          return { ok: false, reason: "That proposal is for a Word document.", applied: 0 };
         try {
           const r = applySheetOps(engine(wb), p.ops);
           if (r.applied) onDirty();
           return r;
         } catch (e) {
           logClientError(e, "office", { kind: "xlsx", stage: "apply-proposal" });
-          return { ok: false, reason: e instanceof Error ? e.message : "Couldn't apply the cells.", applied: 0 };
+          return {
+            ok: false,
+            reason: e instanceof Error ? e.message : "Couldn't apply the cells.",
+            applied: 0,
+          };
         }
       },
       export: async () => {

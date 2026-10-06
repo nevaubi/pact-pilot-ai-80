@@ -398,7 +398,15 @@ function OfficePage() {
         <div className="min-h-0 min-w-0 flex-1">
           <Suspense fallback={<Skeleton className="m-6 h-[60vh]" />}>
             {kind === "docx" && (
-              <DocxEditor blob={blob} name={file.name} user={user} mode={mode} onDirty={onDirty} handle={editor} onError={onEditorError} />
+              <DocxEditor
+                blob={blob}
+                name={file.name}
+                user={user}
+                mode={mode}
+                onDirty={onDirty}
+                handle={editor}
+                onError={onEditorError}
+              />
             )}
             {kind === "pdf" && (
               <PdfViewer
@@ -412,10 +420,19 @@ function OfficePage() {
                 onError={onEditorError}
               />
             )}
-            {kind === "xlsx" && <SheetEditor blob={blob} name={file.name} onDirty={onDirty} handle={editor} onError={onEditorError} />}
+            {kind === "xlsx" && (
+              <SheetEditor
+                blob={blob}
+                name={file.name}
+                onDirty={onDirty}
+                handle={editor}
+                onError={onEditorError}
+              />
+            )}
             {(kind === "text" || !kind) && (
               <pre className="h-full overflow-auto whitespace-pre-wrap p-6 text-sm">
-                {file.extracted_text ?? "This file type can't be opened in the editor. Download it instead."}
+                {file.extracted_text ??
+                  "This file type can't be opened in the editor. Download it instead."}
               </pre>
             )}
           </Suspense>

@@ -94,7 +94,13 @@ function loadTurns(key: string): Turn[] {
     // A reload mid-stream leaves a dangling turn; mark it stopped so the UI is honest.
     return t.map((x) =>
       x.status === "streaming"
-        ? { ...x, status: "stopped" as const, activity: x.activity?.map((a) => (a.status === "running" ? { ...a, status: "error" as const } : a)) }
+        ? {
+            ...x,
+            status: "stopped" as const,
+            activity: x.activity?.map((a) =>
+              a.status === "running" ? { ...a, status: "error" as const } : a,
+            ),
+          }
         : x,
     );
   } catch {
@@ -114,7 +120,13 @@ export type SendOpts = {
  * each request owns an AbortController tied to its id and store key, and only that request may clean
  * up after itself. Deltas are batched (~50 ms) and persistence is debounced while streaming.
  */
-export function useAssist(o: { matterId: string; storeKey: string; effort: Effort; mode?: "assist" | "draft"; flushMs?: number }) {
+export function useAssist(o: {
+  matterId: string;
+  storeKey: string;
+  effort: Effort;
+  mode?: "assist" | "draft";
+  flushMs?: number;
+}) {
   const { matterId, storeKey, effort, mode = "assist", flushMs = 50 } = o;
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
@@ -177,7 +189,9 @@ export function useAssist(o: { matterId: string; storeKey: string; effort: Effor
   );
 
   const patch = useCallback((id: string, p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) => {
-    setTurns((ts) => ts.map((t) => (t.id === id ? { ...t, ...(typeof p === "function" ? p(t) : p) } : t)));
+    setTurns((ts) =>
+      ts.map((t) => (t.id === id ? { ...t, ...(typeof p === "function" ? p(t) : p) } : t)),
+    );
   }, []);
 
   const send = useCallback(
@@ -202,13 +216,20 @@ export function useAssist(o: { matterId: string; storeKey: string; effort: Effor
         anchor,
         ...(opts.attachments?.length ? { attachments: opts.attachments.map((a) => a.name) } : {}),
       };
-      setTurns((ts) => (opts.replaceId ? ts.map((t) => (t.id === opts.replaceId ? turn : t)) : [...ts, turn]));
+      setTurns((ts) =>
+        opts.replaceId ? ts.map((t) => (t.id === opts.replaceId ? turn : t)) : [...ts, turn],
+      );
       setBusy(true);
       const finish = (p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) => {
         flushDeltas();
         patch(id, (t) => {
           const next = { ...t, ...(typeof p === "function" ? p(t) : p) };
-          return { ...next, activity: next.activity?.map((a) => (a.status === "running" ? { ...a, status: "error" as const } : a)) };
+          return {
+            ...next,
+            activity: next.activity?.map((a) =>
+              a.status === "running" ? { ...a, status: "error" as const } : a,
+            ),
+          };
         });
       };
       try {
@@ -232,7 +253,10 @@ export function useAssist(o: { matterId: string; storeKey: string; effort: Effor
         });
         if (!mine()) return true;
         if (!res.ok || !res.body) {
-          const j = (await res.json().catch(() => ({}))) as { message?: string; retryable?: boolean };
+          const j = (await res.json().catch(() => ({}))) as {
+            message?: string;
+            retryable?: boolean;
+          };
           finish({
             status: "error",
             error: j.message ?? `AI request failed (${res.status}).`,
@@ -241,40 +265,60 @@ export function useAssist(o: { matterId: string; storeKey: string; effort: Effor
           return true;
         }
         runIdRef.current = res.headers.get("X-Lovable-AIG-Run-ID") ?? runIdRef.current;
-        const { terminal } = await readNdjson<Event>(res.body, (ev) => {
-          if (!mine()) return;
-          if (ev.t === "delta") {
-            pending.current.set(id, (pending.current.get(id) ?? "") + ev.text);
-            if (!flushTimer.current) flushTimer.current = setTimeout(flushDeltas, flushMs);
-          } else if (ev.t === "sources") patch(id, { sources: ev.items });
-          else if (ev.t === "activity")
-            patch(id, (t) => {
-              const list = t.activity ?? [];
-              const has = list.some((a) => a.id === ev.id);
-              return {
-                activity: has
-                  ? list.map((a) => (a.id === ev.id ? { ...a, status: ev.status, ...(ev.label ? { label: ev.label } : {}) } : a))
-                  : [...list, { id: ev.id, label: ev.label ?? "Working", status: ev.status }],
-              };
-            });
-          else if (ev.t === "proposal") patch(id, { proposal: { proposal: ev.proposal, validation: ev.validation } });
-          else if (ev.t === "notice") patch(id, { notice: ev.text });
-          else if (ev.t === "done") {
-            finish({ status: "done", usage: ev.usage, steps: ev.steps });
-            if (ev.runId) runIdRef.current = ev.runId;
-            qc.invalidateQueries({ queryKey: ["ai-usage"] });
-          } else if (ev.t === "error")
-            finish((t) => ({ status: t.a || pending.current.get(id) ? "stopped" : "error", error: ev.message, retryable: ev.retryable }));
-        }, undefined, controller.signal);
+        const { terminal } = await readNdjson<Event>(
+          res.body,
+          (ev) => {
+            if (!mine()) return;
+            if (ev.t === "delta") {
+              pending.current.set(id, (pending.current.get(id) ?? "") + ev.text);
+              if (!flushTimer.current) flushTimer.current = setTimeout(flushDeltas, flushMs);
+            } else if (ev.t === "sources") patch(id, { sources: ev.items });
+            else if (ev.t === "activity")
+              patch(id, (t) => {
+                const list = t.activity ?? [];
+                const has = list.some((a) => a.id === ev.id);
+                return {
+                  activity: has
+                    ? list.map((a) =>
+                        a.id === ev.id
+                          ? { ...a, status: ev.status, ...(ev.label ? { label: ev.label } : {}) }
+                          : a,
+                      )
+                    : [...list, { id: ev.id, label: ev.label ?? "Working", status: ev.status }],
+                };
+              });
+            else if (ev.t === "proposal")
+              patch(id, { proposal: { proposal: ev.proposal, validation: ev.validation } });
+            else if (ev.t === "notice") patch(id, { notice: ev.text });
+            else if (ev.t === "done") {
+              finish({ status: "done", usage: ev.usage, steps: ev.steps });
+              if (ev.runId) runIdRef.current = ev.runId;
+              qc.invalidateQueries({ queryKey: ["ai-usage"] });
+            } else if (ev.t === "error")
+              finish((t) => ({
+                status: t.a || pending.current.get(id) ? "stopped" : "error",
+                error: ev.message,
+                retryable: ev.retryable,
+              }));
+          },
+          undefined,
+          controller.signal,
+        );
         if (mine() && !terminal)
           finish((t) => ({
             status: t.a ? "stopped" : "error",
-            error: t.a ? "The connection dropped — the answer may be incomplete." : "The connection dropped before an answer arrived.",
+            error: t.a
+              ? "The connection dropped — the answer may be incomplete."
+              : "The connection dropped before an answer arrived.",
             retryable: true,
           }));
       } catch (e) {
         if ((e as Error).name === "AbortError")
-          finish((t) => ({ status: t.a ? "stopped" : "error", error: t.a ? undefined : "Stopped.", retryable: true }));
+          finish((t) => ({
+            status: t.a ? "stopped" : "error",
+            error: t.a ? undefined : "Stopped.",
+            retryable: true,
+          }));
         else finish({ status: "error", error: (e as Error).message, retryable: true });
       } finally {
         if (mine()) {
@@ -293,7 +337,10 @@ export function useAssist(o: { matterId: string; storeKey: string; effort: Effor
     setTurns([]);
     runIdRef.current = undefined;
   }, [abortCurrent]);
-  const markApplied = useCallback((id: string, apply: Turn["apply"]) => patch(id, { apply }), [patch]);
+  const markApplied = useCallback(
+    (id: string, apply: Turn["apply"]) => patch(id, { apply }),
+    [patch],
+  );
 
   return { turns, busy, send, stop, clear, markApplied };
 }
