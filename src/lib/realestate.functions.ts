@@ -40,11 +40,8 @@ export const reviewTitleSurvey = createServerFn({ method: "POST" })
         const t = (f.extracted_text ?? "").slice(0, cap);
         return `=== ${label}: ${f.name}${(f.extracted_text?.length ?? 0) > cap ? " (truncated)" : ""} ===\n${t || "[no readable text]"}\n`;
       };
-      const { data: prop } = await supabase.from("matter_properties").select("*").eq("matter_id", data.matterId).maybeSingle();
+      // matterContext already carries the property/deal record line when one exists.
       const ctx = await matterContext(supabase, data.matterId, data.effort, false);
-      const propLine = prop
-        ? `PROPERTY: ${[prop.address, prop.city, prop.state, prop.zip].filter(Boolean).join(", ")} | PIN ${prop.pin ?? "—"} | ${prop.property_type} | County ${prop.county}${prop.in_chicago ? " (Chicago)" : ""} | Our side: ${prop.side} | Price ${prop.purchase_price ?? "—"} | Loan ${prop.loan_amount ?? "—"} | Closing ${prop.closing_date ?? "—"} | Title co. ${prop.title_company ?? "—"} | Survey date ${prop.survey_date ?? "—"}`
-        : "PROPERTY: no property record yet.";
       const src = await matterSources(
         supabase,
         data.matterId,
