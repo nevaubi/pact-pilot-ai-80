@@ -81,6 +81,14 @@ function Harness() {
       originals: () => blobs,
       office: () => import("@/lib/office"),
       xlsxPkg: () => import("@/lib/xlsx-package"),
+      /** Run the real Word adapter over a (possibly instrumented) Document API object. */
+      applyVia: async (d: unknown, edits: unknown) => {
+        const [{ wordEngine }, { applyWordEdits }] = await Promise.all([
+          import("@/components/office/DocxEditor"),
+          import("@/lib/office-apply"),
+        ]);
+        return applyWordEdits(wordEngine(d as never), edits as never);
+      },
     };
   }, [dirty, blobs]);
   if (!blobs) return <p className="p-6 text-sm">Generating synthetic files…</p>;
