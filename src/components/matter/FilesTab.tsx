@@ -162,7 +162,7 @@ export function FilesTab({ matterId }: { matterId: string }) {
           setOver(false);
           onFiles(e.dataTransfer.files);
         }}
-        className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed bg-card p-8 text-center transition-colors ${over ? "border-primary bg-primary/5" : "hover:border-primary"} ${busy ? "pointer-events-none opacity-70" : ""}`}
+        className={`flex cursor-pointer flex-col items-center gap-2 rounded border border-dashed bg-card p-6 text-center transition-colors ${over ? "border-primary bg-primary/5" : "hover:border-primary"} ${busy ? "pointer-events-none opacity-70" : ""}`}
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
         <p className="text-sm font-medium">

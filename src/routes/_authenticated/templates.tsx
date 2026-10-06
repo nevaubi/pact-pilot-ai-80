@@ -158,12 +158,12 @@ function Templates() {
   }
 
   return (
-    <div className="pb-10">
+    <div className="pb-8">
       <PageHeader
         title="House templates"
         subtitle="Drafts always start from these forms, so every deal reads the way your firm writes."
       />
-      <div className="grid gap-4 px-4 md:px-8 lg:grid-cols-3">
+      <div className="grid gap-4 p-4 md:p-6 lg:grid-cols-[300px_minmax(0,1fr)]">
         <div className="space-y-4">
           <Panel title="Add templates">
             <div className="space-y-3">
@@ -183,7 +183,7 @@ function Templates() {
                 </Select>
               </div>
               <label
-                className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed p-5 text-center transition-colors hover:border-primary ${busy ? "pointer-events-none opacity-70" : ""}`}
+                className={`flex cursor-pointer flex-col items-center gap-1 rounded border border-dashed p-4 text-center transition-colors hover:border-primary ${busy ? "pointer-events-none opacity-70" : ""}`}
               >
                 <Upload className="h-5 w-5 text-muted-foreground" />
                 <span className="text-sm">
@@ -221,7 +221,7 @@ function Templates() {
                       <button
                         onClick={() => setSelId(t.id)}
                         aria-current={selId === t.id}
-                        className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-sm ${selId === t.id ? "bg-raised" : "hover:bg-raised/60"}`}
+                        className={`flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-2 text-left text-sm ${selId === t.id ? "bg-raised" : "hover:bg-raised/60"}`}
                       >
                         <FileText className="h-4 w-4 shrink-0 text-ink-blue" />
                         <span className="flex-1 truncate">{t.name}</span>
@@ -287,7 +287,7 @@ function Templates() {
                 </div>
                 <Blanks body={draft.body} />
                 <Textarea
-                  className="min-h-[55vh] bg-raised font-serif text-[13px] leading-relaxed"
+                  className="min-h-[55vh] bg-raised font-mono text-[12px] leading-relaxed"
                   value={draft.body}
                   onChange={(e) => setDraft({ ...draft, body: e.target.value })}
                   aria-label="Template text"
@@ -295,7 +295,7 @@ function Templates() {
               </div>
             </Panel>
           ) : (
-            <div className="grid h-full min-h-[300px] place-items-center rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            <div className="grid h-full min-h-[300px] place-items-center rounded border border-dashed p-6 text-center text-sm text-muted-foreground">
               {data.length
                 ? "Select a template to view or edit it."
                 : "Upload a form on the left to get started. Word files keep their original alongside the editable text."}

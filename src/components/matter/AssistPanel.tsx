@@ -236,7 +236,7 @@ export function AssistPanel({
       <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
         <SheetHeader className="border-b p-4 text-left">
           <SheetTitle className="flex items-center gap-2">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ink-purple text-primary-foreground">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded bg-ink-purple text-primary-foreground">
               <Sparkle className="h-4 w-4" />
             </span>
             <span className="truncate">
@@ -267,7 +267,7 @@ export function AssistPanel({
                   <button
                     key={v}
                     onClick={() => send(v)}
-                    className="rounded-full border bg-raised px-3 py-1.5 text-xs transition-colors hover:border-ink-purple hover:text-ink-purple"
+                    className="rounded border bg-raised px-2.5 py-1.5 text-left text-xs transition-colors hover:border-ink-purple hover:text-ink-purple"
                   >
                     {v}
                   </button>
@@ -277,7 +277,7 @@ export function AssistPanel({
           )}
           {turns.map((t) => (
             <div key={t.id} className="space-y-2">
-              <div className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-foreground px-3 py-2 text-sm text-background">
+               <div className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded border bg-raised px-3 py-2 text-sm text-foreground">
                 {t.q}
               </div>
               {t.a || t.status !== "streaming" ? (
@@ -356,7 +356,7 @@ export function AssistPanel({
             send(q);
           }}
         >
-          <div className="flex items-end gap-2 rounded-xl border bg-card p-2">
+          <div className="flex items-end gap-2 rounded border bg-card p-2">
             <Textarea
               ref={inputRef}
               rows={2}

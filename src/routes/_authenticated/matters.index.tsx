@@ -51,7 +51,7 @@ const VIEW_KEY = "mirza-matters-view";
 function Matters() {
   const q = useQuery(mattersQ);
   const data = q.data ?? [];
-  const [view, setView] = useState<"cards" | "list">("cards");
+  const [view, setView] = useState<"cards" | "list">("list");
   const [area, setArea] = useState<string>("All");
   const [status, setStatus] = useState<string>("Open");
   const [term, setTerm] = useState("");
@@ -80,13 +80,13 @@ function Matters() {
   const filtered = { ...q, data: q.data ? rows : undefined } as typeof q;
 
   return (
-    <div className="pb-10">
+    <div className="pb-8">
       <PageHeader
         title="Matters"
         subtitle={q.data ? `${rows.length} of ${data.length} shown` : undefined}
         actions={<NewMatter />}
       />
-      <div className="flex flex-wrap items-center gap-2 px-4 pb-4 md:px-8">
+      <div className="flex flex-wrap items-center gap-2 border-b bg-card px-4 py-3 md:px-6">
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -102,7 +102,7 @@ function Matters() {
             <button
               key={a}
               onClick={() => setArea(a)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${area === a ? "bg-foreground text-background" : "bg-card text-muted-foreground hover:text-foreground"}`}
+              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${area === a ? "bg-foreground text-background" : "bg-raised text-muted-foreground hover:text-foreground"}`}
             >
               {a}
             </button>
@@ -120,12 +120,12 @@ function Matters() {
             ))}
           </SelectContent>
         </Select>
-        <div className="ml-auto inline-flex rounded-lg border bg-card p-0.5">
+        <div className="ml-auto inline-flex rounded border bg-card p-0.5">
           <button
             aria-label="Card view"
             aria-pressed={view === "cards"}
             onClick={() => pickView("cards")}
-            className={`rounded-md p-1.5 ${view === "cards" ? "bg-raised" : ""}`}
+            className={`rounded-sm p-1.5 ${view === "cards" ? "bg-raised" : ""}`}
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
@@ -133,13 +133,13 @@ function Matters() {
             aria-label="List view"
             aria-pressed={view === "list"}
             onClick={() => pickView("list")}
-            className={`rounded-md p-1.5 ${view === "list" ? "bg-raised" : ""}`}
+            className={`rounded-sm p-1.5 ${view === "list" ? "bg-raised" : ""}`}
           >
             <List className="h-4 w-4" />
           </button>
         </div>
       </div>
-      <div className="px-4 md:px-8">
+      <div className="p-4 md:p-6">
         <ListState
           query={filtered}
           rows={4}
@@ -157,7 +157,7 @@ function Matters() {
                     key={m.id}
                     to="/matters/$id"
                     params={{ id: m.id }}
-                    className="group rounded-xl border bg-card p-4 transition-shadow hover:shadow-md"
+                    className="group rounded border bg-card p-3 transition-colors hover:border-primary/40"
                   >
                     <div className="mb-2 flex items-center justify-between">
                       <PracticeChip area={m.practice_area} />
@@ -182,23 +182,23 @@ function Matters() {
                 ))}
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border bg-card">
+              <div className="overflow-x-auto rounded border bg-card">
                 <table className="w-full text-sm">
                   <thead className="bg-raised text-left text-xs text-muted-foreground">
                     <tr>
-                      <th className="px-4 py-2">No.</th>
-                      <th className="px-4 py-2">Matter</th>
-                      <th className="px-4 py-2">Client</th>
-                      <th className="px-4 py-2">Practice</th>
-                      <th className="px-4 py-2">Status</th>
-                      <th className="px-4 py-2">Opened</th>
+                      <th className="px-3 py-2 font-semibold">No.</th>
+                      <th className="px-3 py-2 font-semibold">Matter</th>
+                      <th className="px-3 py-2 font-semibold">Client</th>
+                      <th className="px-3 py-2 font-semibold">Practice</th>
+                      <th className="px-3 py-2 font-semibold">Status</th>
+                      <th className="px-3 py-2 font-semibold">Opened</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {list.map((m) => (
                       <tr key={m.id} className="hover:bg-raised/60">
-                        <td className="px-4 py-2 font-mono text-xs">{m.number}</td>
-                        <td className="px-4 py-2">
+                        <td className="px-3 py-2 font-mono text-xs">{m.number}</td>
+                        <td className="px-3 py-2">
                           <Link
                             to="/matters/$id"
                             params={{ id: m.id }}
@@ -207,14 +207,14 @@ function Matters() {
                             {m.title}
                           </Link>
                         </td>
-                        <td className="px-4 py-2 text-muted-foreground">{m.client}</td>
-                        <td className="px-4 py-2">
+                        <td className="px-3 py-2 text-muted-foreground">{m.client}</td>
+                        <td className="px-3 py-2">
                           <PracticeChip area={m.practice_area} />
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-3 py-2">
                           <StatusDot status={m.status} />
                         </td>
-                        <td className="px-4 py-2 text-xs text-muted-foreground">
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
                           {fmtDate(m.opened_on)}
                         </td>
                       </tr>
