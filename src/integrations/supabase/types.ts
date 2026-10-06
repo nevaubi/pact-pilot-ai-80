@@ -14,7 +14,473 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity: {
+        Row: {
+          actor: string | null
+          created_at: string
+          id: string
+          matter_id: string | null
+          message: string
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          id?: string
+          matter_id?: string | null
+          message: string
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          id?: string
+          matter_id?: string | null
+          message?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_runs: {
+        Row: {
+          created_at: string
+          effort: string
+          id: string
+          input_tokens: number | null
+          kind: string
+          matter_id: string | null
+          output_tokens: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          effort: string
+          id?: string
+          input_tokens?: number | null
+          kind: string
+          matter_id?: string | null
+          output_tokens?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          effort?: string
+          id?: string
+          input_tokens?: number | null
+          kind?: string
+          matter_id?: string | null
+          output_tokens?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_runs_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      closing_items: {
+        Row: {
+          created_at: string
+          deliverable: string
+          due_on: string | null
+          id: string
+          matter_id: string
+          notes: string | null
+          position: number
+          responsible: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          deliverable: string
+          due_on?: string | null
+          id?: string
+          matter_id: string
+          notes?: string | null
+          position?: number
+          responsible?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          deliverable?: string
+          due_on?: string | null
+          id?: string
+          matter_id?: string
+          notes?: string | null
+          position?: number
+          responsible?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "closing_items_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          organization: string | null
+          phone: string | null
+          role: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          organization?: string | null
+          phone?: string | null
+          role?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          organization?: string | null
+          phone?: string | null
+          role?: string | null
+        }
+        Relationships: []
+      }
+      deadlines: {
+        Row: {
+          created_at: string
+          due_on: string
+          id: string
+          kind: string | null
+          matter_id: string
+          source: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          due_on: string
+          id?: string
+          kind?: string | null
+          matter_id: string
+          source?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          due_on?: string
+          id?: string
+          kind?: string | null
+          matter_id?: string
+          source?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deadlines_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drafts: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          matter_id: string
+          status: string
+          template_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          matter_id: string
+          status?: string
+          template_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          matter_id?: string
+          status?: string
+          template_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drafts_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drafts_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      files: {
+        Row: {
+          created_at: string
+          extracted_text: string | null
+          id: string
+          matter_id: string | null
+          name: string
+          path: string
+          size: number | null
+        }
+        Insert: {
+          created_at?: string
+          extracted_text?: string | null
+          id?: string
+          matter_id?: string | null
+          name: string
+          path: string
+          size?: number | null
+        }
+        Update: {
+          created_at?: string
+          extracted_text?: string | null
+          id?: string
+          matter_id?: string | null
+          name?: string
+          path?: string
+          size?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "files_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matter_contacts: {
+        Row: {
+          contact_id: string
+          id: string
+          matter_id: string
+          relationship: string | null
+        }
+        Insert: {
+          contact_id: string
+          id?: string
+          matter_id: string
+          relationship?: string | null
+        }
+        Update: {
+          contact_id?: string
+          id?: string
+          matter_id?: string
+          relationship?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matter_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matter_contacts_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matters: {
+        Row: {
+          client: string | null
+          created_at: string
+          id: string
+          number: string | null
+          opened_on: string | null
+          practice_area: string
+          responsible: string | null
+          status: string
+          summary: string | null
+          title: string
+        }
+        Insert: {
+          client?: string | null
+          created_at?: string
+          id?: string
+          number?: string | null
+          opened_on?: string | null
+          practice_area?: string
+          responsible?: string | null
+          status?: string
+          summary?: string | null
+          title: string
+        }
+        Update: {
+          client?: string | null
+          created_at?: string
+          id?: string
+          number?: string | null
+          opened_on?: string | null
+          practice_area?: string
+          responsible?: string | null
+          status?: string
+          summary?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      notes: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          matter_id: string
+          title: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          kind?: string
+          matter_id: string
+          title?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          matter_id?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          assignee: string | null
+          created_at: string
+          done: boolean
+          due_on: string | null
+          id: string
+          matter_id: string
+          source: string
+          title: string
+        }
+        Insert: {
+          assignee?: string | null
+          created_at?: string
+          done?: boolean
+          due_on?: string | null
+          id?: string
+          matter_id: string
+          source?: string
+          title: string
+        }
+        Update: {
+          assignee?: string | null
+          created_at?: string
+          done?: boolean
+          due_on?: string | null
+          id?: string
+          matter_id?: string
+          source?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          name: string
+          path: string | null
+          practice_area: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          name: string
+          path?: string | null
+          practice_area?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          name?: string
+          path?: string | null
+          practice_area?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
