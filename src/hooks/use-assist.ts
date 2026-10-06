@@ -35,7 +35,9 @@ export type Turn = {
   notice?: string | undefined;
   steps?: number | undefined;
   /** Attorney-driven apply outcome: never re-attempted automatically. */
-  apply?: { state: "applied" | "failed"; note: string } | undefined;
+  apply?: { state: "applied" | "failed" | "partial"; note: string } | undefined;
+  /** Spreadsheets: sheet active when asked; legacy cell answers are pinned to it. */
+  askSheet?: string | undefined;
   attachments?: string[] | undefined;
 };
 
@@ -55,7 +57,7 @@ type Event =
   | { t: "activity"; id: string; label?: string; status: Activity["status"] }
   | { t: "proposal"; proposal: Proposal; validation: Validation }
   | { t: "notice"; text: string }
-  | { t: "done"; usage: Usage; runId: string | null; steps?: number }
+  | { t: "done"; usage: Usage; runId: string | null; steps?: number; exhausted?: boolean }
   | { t: "error"; message: string; retryable: boolean };
 
 /** Turn [S2] tags into links to the cited source and list only the sources actually cited. */
@@ -109,16 +111,37 @@ function loadTurns(key: string): Turn[] {
 }
 
 export type SendOpts = {
-  replaceId?: string;
   label?: string;
   document?: DocContext | undefined;
   attachments?: AttachmentPayload[] | undefined;
+  /** Called synchronously once the request is accepted (lock acquired), before any network work. */
+  onStart?: () => void;
 };
 
+type Req = {
+  id: string;
+  key: string;
+  controller: AbortController;
+  /** False once superseded (clear / file switch / unmount): nothing it does may touch state again. */
+  alive: boolean;
+  pending: string;
+  timer: ReturnType<typeof setTimeout> | null;
+};
+
+function persist(key: string, turns: Turn[]) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(turns.slice(-20)));
+  } catch {
+    /* quota or storage disabled */
+  }
+}
+
 /**
- * Streaming conversation with /api/assist for one file. One request at a time (synchronous ref lock);
- * each request owns an AbortController tied to its id and store key, and only that request may clean
- * up after itself. Deltas are batched (~50 ms) and persistence is debounced while streaming.
+ * Streaming conversation with /api/assist for one file. One request at a time (synchronous ref lock).
+ * Every state change a request makes — deltas, events, errors, cleanup — is owned by that request's
+ * identity and ignored once it is superseded, so a stale request can never write into a newer turn.
+ * Deltas are batched (~50 ms) per request; persistence is debounced while streaming and flushed on
+ * stop, file switch and unmount.
  */
 export function useAssist(o: {
   matterId: string;
@@ -128,84 +151,102 @@ export function useAssist(o: {
   flushMs?: number;
 }) {
   const { matterId, storeKey, effort, mode = "assist", flushMs = 50 } = o;
-  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turns, setTurnsState] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const turnsRef = useRef<Turn[]>([]);
-  turnsRef.current = turns;
+  const setTurns = useCallback((fn: (ts: Turn[]) => Turn[]) => {
+    turnsRef.current = fn(turnsRef.current);
+    setTurnsState(turnsRef.current);
+  }, []);
   const runIdRef = useRef<string | undefined>(undefined);
-  const reqRef = useRef<{ id: string; key: string; controller: AbortController } | null>(null);
-  const pending = useRef(new Map<string, string>());
-  const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reqRef = useRef<Req | null>(null);
+  const keyRef = useRef(storeKey);
   const qc = useQueryClient();
 
-  const flushDeltas = useCallback(() => {
-    if (flushTimer.current) clearTimeout(flushTimer.current);
-    flushTimer.current = null;
-    if (!pending.current.size) return;
-    const add = new Map(pending.current);
-    pending.current.clear();
-    setTurns((ts) => ts.map((t) => (add.has(t.id) ? { ...t, a: t.a + add.get(t.id)! } : t)));
-  }, []);
+  const flushReq = useCallback(
+    (r: Req) => {
+      if (r.timer) clearTimeout(r.timer);
+      r.timer = null;
+      if (!r.alive || !r.pending) return;
+      const add = r.pending;
+      r.pending = "";
+      setTurns((ts) => ts.map((t) => (t.id === r.id ? { ...t, a: t.a + add } : t)));
+    },
+    [setTurns],
+  );
 
-  const abortCurrent = useCallback(() => {
-    const r = reqRef.current;
-    reqRef.current = null;
-    r?.controller.abort();
-    flushDeltas();
-    setBusy(false);
-  }, [flushDeltas]);
+  /** Supersede the current request: keep its partial answer (persisted under its own key), then abort. */
+  const supersede = useCallback(
+    (o: { keep: boolean }) => {
+      const r = reqRef.current;
+      reqRef.current = null;
+      if (!r) return;
+      if (o.keep && r.key === keyRef.current) {
+        flushReq(r);
+        setTurns((ts) =>
+          ts.map((t) =>
+            t.id === r.id && t.status === "streaming"
+              ? {
+                  ...t,
+                  status: t.a ? "stopped" : "error",
+                  error: t.a ? undefined : "Stopped.",
+                  retryable: true,
+                  activity: t.activity?.map((x) =>
+                    x.status === "running" ? { ...x, status: "error" as const } : x,
+                  ),
+                }
+              : t,
+          ),
+        );
+        persist(r.key, turnsRef.current);
+      }
+      if (r.timer) clearTimeout(r.timer);
+      r.alive = false;
+      r.controller.abort();
+      setBusy(false);
+    },
+    [flushReq, setTurns],
+  );
 
-  // Switching files: abort the old request before loading the new conversation.
+  // Switching files: keep and persist the old file's partial answer, abort, then load the new conversation.
   const [hydrated, setHydrated] = useState<string | null>(null);
   useEffect(() => {
-    abortCurrent();
-    setTurns(loadTurns(storeKey));
+    supersede({ keep: true });
+    keyRef.current = storeKey;
+    turnsRef.current = loadTurns(storeKey);
+    setTurnsState(turnsRef.current);
     setHydrated(storeKey);
     runIdRef.current = undefined;
-  }, [storeKey, abortCurrent]);
+  }, [storeKey, supersede]);
 
   // Persist: immediately when idle, debounced while streaming.
   useEffect(() => {
     if (hydrated !== storeKey) return;
-    const write = () => {
-      try {
-        sessionStorage.setItem(storeKey, JSON.stringify(turnsRef.current.slice(-20)));
-      } catch {
-        /* quota */
-      }
-    };
-    if (!turns.some((t) => t.status === "streaming")) return void write();
-    const h = setTimeout(write, 1000);
+    if (!turns.some((t) => t.status === "streaming")) return void persist(storeKey, turns);
+    const h = setTimeout(() => persist(storeKey, turnsRef.current), 1000);
     return () => clearTimeout(h);
   }, [turns, hydrated, storeKey]);
 
-  useEffect(
-    () => () => {
-      reqRef.current?.controller.abort();
-      reqRef.current = null;
-      if (flushTimer.current) clearTimeout(flushTimer.current);
-    },
-    [],
-  );
-
-  const patch = useCallback((id: string, p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) => {
-    setTurns((ts) =>
-      ts.map((t) => (t.id === id ? { ...t, ...(typeof p === "function" ? p(t) : p) } : t)),
-    );
-  }, []);
+  useEffect(() => () => supersede({ keep: true }), [supersede]);
 
   const send = useCallback(
     async (text: string, opts: SendOpts = {}) => {
       const question = text.trim();
       if (!question || reqRef.current) return false; // synchronous lock: double submits are ignored
-      const id = opts.replaceId ?? crypto.randomUUID();
-      const key = storeKey;
-      const controller = new AbortController();
-      const me = { id, key, controller };
+      const id = crypto.randomUUID();
+      const me: Req = {
+        id,
+        key: storeKey,
+        controller: new AbortController(),
+        alive: true,
+        pending: "",
+        timer: null,
+      };
       reqRef.current = me;
-      const mine = () => reqRef.current === me;
-      const history = budgetHistory(turnsRef.current, opts.replaceId);
-      const anchor = opts.document?.selection?.trim() || undefined;
+      const signal = me.controller.signal;
+      const history = budgetHistory(turnsRef.current);
+      const anchor = opts.document?.selection?.trim() ? opts.document.selection : undefined;
+      const askSheet = opts.document?.workbook?.active;
       const turn: Turn = {
         id,
         q: question,
@@ -214,15 +255,22 @@ export function useAssist(o: {
         status: "streaming",
         label: opts.label,
         anchor,
+        ...(askSheet ? { askSheet } : {}),
         ...(opts.attachments?.length ? { attachments: opts.attachments.map((a) => a.name) } : {}),
       };
-      setTurns((ts) =>
-        opts.replaceId ? ts.map((t) => (t.id === opts.replaceId ? turn : t)) : [...ts, turn],
-      );
+      setTurns((ts) => [...ts, turn]);
       setBusy(true);
+      opts.onStart?.();
+      /** Patch only this request's turn, only while it is still the live owner. */
+      const patch = (p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) => {
+        if (!me.alive) return;
+        setTurns((ts) =>
+          ts.map((t) => (t.id === id ? { ...t, ...(typeof p === "function" ? p(t) : p) } : t)),
+        );
+      };
       const finish = (p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) => {
-        flushDeltas();
-        patch(id, (t) => {
+        flushReq(me);
+        patch((t) => {
           const next = { ...t, ...(typeof p === "function" ? p(t) : p) };
           return {
             ...next,
@@ -232,8 +280,10 @@ export function useAssist(o: {
           };
         });
       };
+      let sawProposal = false;
       try {
         const { data: s } = await supabase.auth.getSession();
+        if (signal.aborted) throw new DOMException("Aborted", "AbortError");
         const token = s.session?.access_token;
         if (!token) throw new Error("Your session has expired. Please sign in again.");
         const res = await fetch("/api/assist", {
@@ -249,9 +299,9 @@ export function useAssist(o: {
             ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
             ...(runIdRef.current ? { runId: runIdRef.current } : {}),
           }),
-          signal: controller.signal,
+          signal,
         });
-        if (!mine()) return true;
+        if (!me.alive) return true;
         if (!res.ok || !res.body) {
           const j = (await res.json().catch(() => ({}))) as {
             message?: string;
@@ -264,17 +314,18 @@ export function useAssist(o: {
           });
           return true;
         }
-        runIdRef.current = res.headers.get("X-Lovable-AIG-Run-ID") ?? runIdRef.current;
+        const rid = res.headers.get("X-Lovable-AIG-Run-ID");
+        if (rid) runIdRef.current = rid;
         const { terminal } = await readNdjson<Event>(
           res.body,
           (ev) => {
-            if (!mine()) return;
+            if (!me.alive) return;
             if (ev.t === "delta") {
-              pending.current.set(id, (pending.current.get(id) ?? "") + ev.text);
-              if (!flushTimer.current) flushTimer.current = setTimeout(flushDeltas, flushMs);
-            } else if (ev.t === "sources") patch(id, { sources: ev.items });
+              me.pending += ev.text;
+              if (!me.timer) me.timer = setTimeout(() => flushReq(me), flushMs);
+            } else if (ev.t === "sources") patch({ sources: ev.items });
             else if (ev.t === "activity")
-              patch(id, (t) => {
+              patch((t) => {
                 const list = t.activity ?? [];
                 const has = list.some((a) => a.id === ev.id);
                 return {
@@ -287,24 +338,48 @@ export function useAssist(o: {
                     : [...list, { id: ev.id, label: ev.label ?? "Working", status: ev.status }],
                 };
               });
-            else if (ev.t === "proposal")
-              patch(id, { proposal: { proposal: ev.proposal, validation: ev.validation } });
-            else if (ev.t === "notice") patch(id, { notice: ev.text });
+            else if (ev.t === "proposal") {
+              sawProposal = true;
+              patch({ proposal: { proposal: ev.proposal, validation: ev.validation } });
+            } else if (ev.t === "notice") patch({ notice: ev.text });
             else if (ev.t === "done") {
-              finish({ status: "done", usage: ev.usage, steps: ev.steps });
+              flushReq(me);
+              const answered = sawProposal || !!turnsRef.current.find((t) => t.id === id)?.a.trim();
+              if (!answered)
+                finish({
+                  status: "error",
+                  usage: ev.usage,
+                  steps: ev.steps,
+                  retryable: true,
+                  error: ev.exhausted
+                    ? "The assistant used all of its steps without reaching an answer. Try a narrower request or Advanced."
+                    : "The assistant finished without an answer. Try again or rephrase the request.",
+                });
+              else
+                finish({
+                  status: "done",
+                  usage: ev.usage,
+                  steps: ev.steps,
+                  ...(ev.exhausted
+                    ? {
+                        notice:
+                          "The assistant reached its step limit; the answer may be incomplete.",
+                      }
+                    : {}),
+                });
               if (ev.runId) runIdRef.current = ev.runId;
               qc.invalidateQueries({ queryKey: ["ai-usage"] });
             } else if (ev.t === "error")
               finish((t) => ({
-                status: t.a || pending.current.get(id) ? "stopped" : "error",
+                status: t.a || me.pending ? "stopped" : "error",
                 error: ev.message,
                 retryable: ev.retryable,
               }));
           },
           undefined,
-          controller.signal,
+          signal,
         );
-        if (mine() && !terminal)
+        if (me.alive && !terminal)
           finish((t) => ({
             status: t.a ? "stopped" : "error",
             error: t.a
@@ -315,31 +390,36 @@ export function useAssist(o: {
       } catch (e) {
         if ((e as Error).name === "AbortError")
           finish((t) => ({
-            status: t.a ? "stopped" : "error",
-            error: t.a ? undefined : "Stopped.",
+            status: t.a || me.pending ? "stopped" : "error",
+            error: t.a || me.pending ? undefined : "Stopped.",
             retryable: true,
           }));
         else finish({ status: "error", error: (e as Error).message, retryable: true });
       } finally {
-        if (mine()) {
+        if (me.timer) clearTimeout(me.timer);
+        if (reqRef.current === me) {
           reqRef.current = null;
           setBusy(false);
+          if (me.alive) persist(me.key, turnsRef.current);
         }
+        me.alive = false;
       }
       return true;
     },
-    [storeKey, effort, matterId, mode, patch, qc, flushDeltas, flushMs],
+    [storeKey, effort, matterId, mode, qc, flushReq, flushMs, setTurns],
   );
 
+  /** Stop keeps the partial answer: the request finishes its own cleanup as "stopped". */
   const stop = useCallback(() => reqRef.current?.controller.abort(), []);
   const clear = useCallback(() => {
-    abortCurrent();
-    setTurns([]);
+    supersede({ keep: false });
+    setTurns(() => []);
     runIdRef.current = undefined;
-  }, [abortCurrent]);
+  }, [supersede, setTurns]);
   const markApplied = useCallback(
-    (id: string, apply: Turn["apply"]) => patch(id, { apply }),
-    [patch],
+    (id: string, apply: Turn["apply"]) =>
+      setTurns((ts) => ts.map((t) => (t.id === id ? { ...t, apply } : t))),
+    [setTurns],
   );
 
   return { turns, busy, send, stop, clear, markApplied };

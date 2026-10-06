@@ -1,5 +1,7 @@
 /** Incremental NDJSON decoding that survives UTF-8 characters and JSON lines split across network chunks. */
-export function createNdjsonDecoder<T = unknown>() {
+export const MAX_NDJSON_LINE = 1_000_000;
+
+export function createNdjsonDecoder<T = unknown>(maxLine = MAX_NDJSON_LINE) {
   const dec = new TextDecoder();
   let buf = "";
   let bad = 0;
@@ -20,6 +22,10 @@ export function createNdjsonDecoder<T = unknown>() {
       buf += dec.decode(chunk, { stream: true });
       const lines = buf.split("\n");
       buf = lines.pop() ?? "";
+      if (buf.length > maxLine) {
+        buf = "";
+        throw new Error("The response stream sent an oversized line and was stopped.");
+      }
       return parse(lines);
     },
     /** Flush the decoder and parse a final line that arrived without a trailing newline. */

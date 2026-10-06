@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   LIMITS,
+  parseRange,
+  sameFormula,
   publicQuery,
   rankedContext,
   readCells,
@@ -57,11 +59,19 @@ describe("document retrieval", () => {
     const t = "One\n\nTwo two\nThree";
     for (const b of toBlocks(t)) expect(t.slice(b.start, b.end)).toBe(b.text);
   });
-  it("tool budget clips aggregate output", () => {
-    const b = new ToolBudget(100);
-    expect(b.take("x".repeat(80)).length).toBe(80);
-    expect(b.take("y".repeat(80))).toContain("clipped");
-    expect(b.take("z")).toContain("budget");
+  it("tool budget returns valid JSON and never passes total − reserve with document data", () => {
+    const b = new ToolBudget(1000);
+    const outs = [
+      b.take({ t: "x".repeat(300) }),
+      b.take({ t: "y".repeat(2000) }),
+      b.take({ t: "z".repeat(50) }),
+    ];
+    for (const o of outs) expect(() => JSON.parse(o)).not.toThrow();
+    expect(JSON.parse(outs[1]!).truncated).toBe(true);
+    expect(JSON.parse(outs[2]!).error).toMatch(/budget/);
+    expect(b.used).toBeLessThanOrEqual(1000);
+    const docChars = outs.slice(0, 2).reduce((n, o) => n + o.length, 0);
+    expect(docChars).toBeLessThanOrEqual(1000 - ToolBudget.RESERVE);
   });
 });
 
@@ -137,5 +147,93 @@ describe("public query hygiene", () => {
       'bulk sales notice Illinois john@client.com $1,250,000 acct 123456789 "the seller shall indemnify the buyer for all losses"',
     );
     expect(q).toBe("bulk sales notice Illinois acct");
+  });
+});
+
+describe("review findings (P0-1)", () => {
+  it("A1:XFD1048576 reads the sparse snapshot quickly instead of scanning 17 billion cells", () => {
+    const cells: Record<string, { v: number }> = {};
+    for (let i = 1; i <= 2000; i++) cells[`B${i}`] = { v: i };
+    const t0 = performance.now();
+    const r = readCells({ sheets: [{ name: "S", cells }] }, "S", "A1:XFD1048576");
+    expect(performance.now() - t0).toBeLessThan(500);
+    expect("cells" in r && r.cells.length).toBe(LIMITS.readCells);
+    expect("truncated" in r && r.truncated).toBe(true);
+    expect("cells" in r && r.cells[0]!.cell).toBe("B1");
+  });
+  it("rejects malformed ranges instead of ignoring segments", () => {
+    expect(parseRange("A1:B2:C3")).toBeNull();
+    expect(parseRange("A1:")).toBeNull();
+    expect(parseRange("B2")).toEqual({ r1: 2, r2: 2, c1: 2, c2: 2 });
+  });
+  it("rejects non-finite numbers like 1e999", () => {
+    expect(
+      validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "number", value: "1e999" }]).ok,
+    ).toBe(false);
+    expect(
+      validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "number", value: "1e3" }]).ok,
+    ).toBe(true);
+  });
+  it("formula comparison keeps string-literal case exact", () => {
+    expect(sameFormula("=sum(a1:a2)", "=SUM(A1:A2)")).toBe(true);
+    expect(sameFormula('=IF(A1,"Yes","No")', '=IF(A1,"YES","NO")')).toBe(false);
+  });
+  it("case-insensitive search reports exact offsets when folding changes length (İ)", () => {
+    const t = "İİİ Closing Date is set.";
+    const r = searchLiteral(t, "closing date");
+    expect(r.total).toBe(1);
+    expect(t.slice(r.hits[0]!.start, r.hits[0]!.end)).toBe("Closing Date");
+  });
+  it("overlong search text is an error, never a silently different search", () => {
+    const r = searchLiteral("abc", "x".repeat(LIMITS.queryChars + 1));
+    expect(r.error).toMatch(/limit/);
+    expect(r.total).toBe(0);
+  });
+  it("validates Word formatting edits", () => {
+    const doc = "ARTICLE 1 DEFINITIONS\nBody text.";
+    const ok = validateWordEdits(doc, [
+      {
+        op: "format",
+        find: "ARTICLE 1 DEFINITIONS",
+        format: {
+          bold: true,
+          italic: null,
+          underline: null,
+          fontSize: 12,
+          fontFamily: "Times New Roman",
+        },
+      },
+    ]);
+    expect(ok.ok).toBe(true);
+    const bad = validateWordEdits(doc, [
+      {
+        op: "format",
+        find: "Body text.",
+        format: {
+          bold: null,
+          italic: null,
+          underline: null,
+          fontSize: 0.3,
+          fontFamily: "<script>",
+        },
+      },
+    ]);
+    expect(bad.errors.join(" ")).toMatch(/font size/);
+    expect(bad.errors.join(" ")).toMatch(/font family/);
+  });
+  it("validates sheet formatting ops", () => {
+    expect(
+      validateSheetOps(
+        ["S"],
+        [{ sheet: "S", cell: "A1", type: "keep", value: "", fill: "#ffcc00", bold: true }],
+      ).ok,
+    ).toBe(true);
+    expect(validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "keep", value: "" }]).ok).toBe(
+      false,
+    );
+    expect(
+      validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "keep", value: "", fill: "red" }])
+        .ok,
+    ).toBe(false);
   });
 });

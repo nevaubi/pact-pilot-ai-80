@@ -50,6 +50,13 @@
       "when": 1791303297505,
       "tag": "0006_client_error_log",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791307241874,
+      "tag": "0007_conflict_safe_file_save",
+      "breakpoints": true
     }
   ]
 }

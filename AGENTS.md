@@ -23,9 +23,7 @@
 - Document text is extracted in the browser (`src/lib/extract.ts`) and stored on `files.extracted_text`; why: Worker runtime can't run pdf/docx parsers.
 - Heavy matter tools load on demand and matter tabs prefetch only their active data; why: routine navigation should not download OCR/AI/editor code or fetch unused tabs.
 - All firm data is shared to any signed-in user (RLS `to authenticated using (true)`); why: phase 1 has no roles.
-- WebAssembly binaries (e.g. pdfium) are served from `public/wasm/` and loaded by URL in client-only code, never imported from source; why: imported .wasm lands in the Worker server bundle and breaks deploys.
-- Office editors (`src/components/office/*`) share one `EditorHandle` (`insert()` returns an `InsertResult`, never a bare boolean) and load lazily on `/office/$fileId`; AI text enters a document only via the attorney clicking Insert/Replace/Apply cells; why: one shell for Word/PDF/sheet and AI stays supportive.
-- AI proposals go into Word as tracked changes regardless of document mode, Replace re-anchors to the text selected at ask time (`Turn.anchor`) via the editor's text search when the live selection is gone, and the ```draft fence is what gets inserted (parsed by `splitDraft` in `src/lib/office-proposals.ts`); why: the attorney always reviews a redline, and clicking in the panel must not lose the target.
-- Spreadsheet proposals are `Sheet!A1 = value` lines parsed by `parseCellAssignments` (`src/lib/office-proposals.ts`) and written through the sheet facade (formulas via `setFormula`); why: cell writes are deterministic and reviewable, not free text.
 - Browser errors are logged to `client_errors` via `logClientError`/`installErrorLogging` in `src/lib/error-log.ts` (wired into the root error boundary, `mut()`/`tryAction()`, the Office route boundary and editor catch blocks) and reviewed under Settings → Error log; messages and stacks only, never document content; why: production failures must be reviewable by the firm without developer tools.
 - Clipboard writes go through `copyText()` in `src/lib/clipboard.ts`; why: clipboard access can be denied and must not surface as an unhandled rejection.
+
+- Office editor, drafting-assistant and save rules live in `src/components/office/AGENTS.md`; why: they only apply there.

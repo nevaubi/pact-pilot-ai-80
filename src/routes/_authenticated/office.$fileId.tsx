@@ -1,7 +1,13 @@
-import { createFileRoute, Link, useRouter, type ErrorComponentProps } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  useBlocker,
+  useRouter,
+  type ErrorComponentProps,
+} from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Download, Save, History, PanelRight } from "lucide-react";
+import { ArrowLeft, Download, FileDown, Save, History, PanelRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { tryAction } from "@/lib/mutate";
@@ -13,6 +19,7 @@ import {
   saveBlobLocally,
   saveNewVersion,
   restoreVersion,
+  SaveConflict,
 } from "@/lib/office";
 import type { DocMode, EditorHandle } from "@/components/office/DocxEditor";
 import type { DocContext } from "@/hooks/use-assist";
@@ -34,7 +41,27 @@ const DraftPanel = lazy(() =>
 
 const PANEL_MIN = 288;
 const PANEL_MAX = 640;
-const clampW = (w: number) => Math.max(PANEL_MIN, Math.min(PANEL_MAX, Math.round(w)));
+/** The editor always keeps at least this much width, so the panel can't crowd it out at 768–1024px. */
+const EDITOR_MIN = 420;
+const clampW = (w: number, container: number) =>
+  Math.max(
+    PANEL_MIN,
+    Math.min(PANEL_MAX, Math.max(PANEL_MIN, container - EDITOR_MIN), Math.round(w)),
+  );
+function readStored(key: string) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeStored(key: string, v: string) {
+  try {
+    localStorage.setItem(key, v);
+  } catch {
+    /* storage disabled */
+  }
+}
 
 export const Route = createFileRoute("/_authenticated/office/$fileId")({
   head: () => ({
@@ -95,6 +122,11 @@ function OfficeError({ error, reset }: ErrorComponentProps) {
 
 function OfficePage() {
   const { fileId } = Route.useParams();
+  // Everything (refs, revisions, panel state) resets when the file changes.
+  return <OfficeFile key={fileId} fileId={fileId} />;
+}
+
+function OfficeFile({ fileId }: { fileId: string }) {
   const qc = useQueryClient();
   const fileQ = useQuery({
     queryKey: ["office-file", fileId],
@@ -130,30 +162,53 @@ function OfficePage() {
     name: "Attorney",
   });
   useEffect(() => {
+    let live = true;
     supabase.auth.getUser().then(({ data }) => {
       const u = data.user;
-      if (u)
+      if (u && live)
         setUser({
           id: u.id,
           name: (u.user_metadata?.["full_name"] as string) || u.email?.split("@")[0] || "Attorney",
           ...(u.email ? { email: u.email } : {}),
         });
     });
+    return () => {
+      live = false;
+    };
   }, []);
 
   const editor = useRef<EditorHandle | null>(null);
-  const pathRef = useRef<string | null>(null);
+  /** Storage path this editing session is based on (the save precondition) and its exact bytes. */
+  const basePath = useRef<string | null>(null);
+  const baseBlob = useRef<Blob | null>(null);
+  /** Edit revision: bumps on every real edit; `saved` is the revision last written to storage. */
+  const rev = useRef(0);
+  const savedRev = useRef(0);
+  const saveLock = useRef(false);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<DocMode>("editing");
   const [panel, setPanel] = useState(true);
   const [showVersions, setShowVersions] = useState(false);
-  const onDirty = useCallback(() => setDirty(true), []);
+  /** Bumps to remount the editor after a restore (new bytes, fresh baseline). */
+  const [generation, setGeneration] = useState(0);
+  const onDirty = useCallback(() => {
+    rev.current++;
+    setDirty(rev.current !== savedRev.current);
+  }, []);
+
+  if (fileQ.data && basePath.current === null) {
+    basePath.current = fileQ.data.file.path;
+    baseBlob.current = fileQ.data.blob;
+  }
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerW, setContainerW] = useState(1280);
   const [panelW, setPanelW] = useState(352);
   const [isWide, setIsWide] = useState(true);
   useEffect(() => {
-    const saved = Number(localStorage.getItem("mirza-panel-w"));
-    if (saved) setPanelW(clampW(saved));
+    const saved = Number(readStored("mirza-panel-w"));
+    if (saved) setPanelW(saved);
     const mq = window.matchMedia("(min-width: 768px)");
     const on = () => {
       setIsWide(mq.matches);
@@ -164,27 +219,37 @@ function OfficePage() {
     return () => mq.removeEventListener("change", on);
   }, []);
   useEffect(() => {
-    localStorage.setItem("mirza-panel-w", String(panelW));
-  }, [panelW]);
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => e && setContainerW(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fileQ.data]);
+  const width = clampW(panelW, containerW);
+  useEffect(() => writeStored("mirza-panel-w", String(panelW)), [panelW]);
+  const stopResize = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopResize.current?.(), []);
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
     const x0 = e.clientX;
-    const w0 = panelW;
-    const move = (ev: PointerEvent) => setPanelW(clampW(w0 + (x0 - ev.clientX)));
+    const w0 = width;
+    const move = (ev: PointerEvent) => setPanelW(clampW(w0 + (x0 - ev.clientX), containerW));
     const up = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      stopResize.current = null;
     };
+    stopResize.current = up;
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
 
-  useEffect(() => {
-    if (!dirty) return;
-    const h = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", h);
-    return () => window.removeEventListener("beforeunload", h);
-  }, [dirty]);
+  useBlocker({
+    shouldBlockFn: () =>
+      rev.current !== savedRev.current &&
+      !window.confirm("You have unsaved changes in this document. Leave without saving?"),
+    enableBeforeUnload: () => rev.current !== savedRev.current,
+  });
 
   if (fileQ.isLoading)
     return (
@@ -204,27 +269,95 @@ function OfficePage() {
   const { file, blob } = fileQ.data;
   const kind = officeKind(file.name);
   const matter = file.matters as { id: string; title: string } | null;
-  // Each save writes a fresh object; keep the current path without remounting the editor.
-  const current = () => ({ ...file, path: pathRef.current ?? file.path });
 
   async function save() {
-    if (!editor.current) return;
+    const ed = editor.current;
+    if (!ed || saveLock.current || rev.current === savedRev.current) return;
+    saveLock.current = true;
     setSaving(true);
-    await tryAction(async () => {
-      const out = await editor.current!.export();
-      const text =
-        kind === "pdf" ? undefined : (await editor.current!.getText()).slice(0, 300000) || null;
-      pathRef.current = await saveNewVersion(current(), out, {
+    const at = rev.current;
+    try {
+      // Export and indexed text must come from the same revision; an edit in between aborts the save.
+      const out = await ed.export();
+      const text = kind === "pdf" ? undefined : (await ed.getText()).slice(0, 300000) || null;
+      if (rev.current !== at) {
+        toast.error(
+          "You edited while the file was being prepared. Nothing was saved — press Save again.",
+        );
+        return;
+      }
+      const newPath = await saveNewVersion(file, basePath.current!, out, {
         ...(text !== undefined ? { text } : {}),
-        editedBy: user.id,
       });
-      setDirty(false);
+      basePath.current = newPath;
+      baseBlob.current = out;
+      ed.markSaved?.(out);
+      savedRev.current = at;
+      setDirty(rev.current !== savedRev.current);
       qc.invalidateQueries({ queryKey: ["file-versions", fileId] });
       qc.invalidateQueries({ queryKey: ["files"] });
       qc.invalidateQueries({ queryKey: ["files-hub"] });
-      toast.success("Saved. The previous version is kept in history.");
-    });
-    setSaving(false);
+      toast.success(
+        rev.current !== at
+          ? "Saved the version from when you pressed Save; your newer edits are still unsaved."
+          : "Saved. The previous version is kept in history.",
+      );
+    } catch (e) {
+      logClientError(e, "office", { fileId, kind: kind ?? "unknown", stage: "save" });
+      toast.error(
+        e instanceof SaveConflict
+          ? e.message
+          : `Not saved: ${e instanceof Error ? e.message : "the editor couldn't produce the file"}. Your changes are still open here.`,
+        { duration: 10_000 },
+      );
+    } finally {
+      saveLock.current = false;
+      setSaving(false);
+    }
+  }
+
+  async function download() {
+    try {
+      // Unchanged since load/save: hand back the exact stored bytes, never a reserialised copy.
+      const out =
+        rev.current === savedRev.current || !editor.current
+          ? (baseBlob.current ?? blob)
+          : await editor.current.export();
+      saveBlobLocally(out, file.name);
+    } catch (e) {
+      logClientError(e, "office", { fileId, kind: kind ?? "unknown", stage: "download" });
+      toast.error(
+        `Couldn't export your edited copy: ${e instanceof Error ? e.message : "unknown error"}. Use "Original" to download the last saved file.`,
+      );
+    }
+  }
+
+  async function restore(v: NonNullable<typeof versionsQ.data>[number]) {
+    if (
+      rev.current !== savedRev.current &&
+      !window.confirm(
+        "Restoring replaces the open document and discards your unsaved changes. Continue?",
+      )
+    )
+      return;
+    if (saveLock.current) return;
+    saveLock.current = true;
+    try {
+      await restoreVersion(file, basePath.current!, v);
+      toast.success("Version restored.");
+      basePath.current = null;
+      baseBlob.current = null;
+      rev.current = 0;
+      savedRev.current = 0;
+      setDirty(false);
+      await qc.invalidateQueries({ queryKey: ["office-file", fileId] });
+      qc.invalidateQueries({ queryKey: ["file-versions", fileId] });
+      setGeneration((g) => g + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't restore that version.");
+    } finally {
+      saveLock.current = false;
+    }
   }
 
   const getDoc = async (): Promise<DocContext> => ({
@@ -239,7 +372,7 @@ function OfficePage() {
     toast.error(m);
     logClientError(new Error(m), "office", { fileId, kind: kind ?? "unknown" });
   };
-
+  const editorKey = `${file.id}:${generation}`;
   return (
     <div className="flex h-[calc(100vh-3rem)] min-h-0 flex-col md:h-screen">
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-card px-3 py-1.5">
@@ -327,21 +460,32 @@ function OfficePage() {
           size="sm"
           variant="ghost"
           className="h-7 text-xs"
-          onClick={async () =>
-            saveBlobLocally(
-              editor.current ? await editor.current.export().catch(() => blob) : blob,
-              file.name,
-            )
+          onClick={() => void download()}
+          title={
+            dirty ? "Download your edited copy" : "Download the saved file (exact original bytes)"
           }
         >
           <Download className="mr-1 h-3.5 w-3.5" />
           Download
         </Button>
+        {dirty && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs"
+            title="Download the last saved file, without your unsaved edits"
+            onClick={() => saveBlobLocally(baseBlob.current ?? blob, file.name)}
+          >
+            <FileDown className="mr-1 h-3.5 w-3.5" />
+            Original
+          </Button>
+        )}
         <Button
           size="sm"
           className="h-7 text-xs"
-          disabled={saving || kind === "text" || !kind}
-          onClick={save}
+          disabled={saving || !dirty || kind === "text" || !kind}
+          title={dirty ? "Save a new version" : "No unsaved changes"}
+          onClick={() => void save()}
         >
           <Save className="mr-1 h-3.5 w-3.5" />
           {saving ? "Saving…" : "Save"}
@@ -375,16 +519,7 @@ function OfficePage() {
                     size="sm"
                     variant="ghost"
                     className="h-6 text-xs"
-                    onClick={() =>
-                      tryAction(async () => {
-                        await restoreVersion(current(), v, user.id);
-                        pathRef.current = null;
-                        toast.success("Version restored.");
-                        await qc.invalidateQueries({ queryKey: ["office-file", fileId] });
-                        qc.invalidateQueries({ queryKey: ["file-versions", fileId] });
-                        setDirty(false);
-                      })
-                    }
+                    onClick={() => void restore(v)}
                   >
                     Restore
                   </Button>
@@ -394,11 +529,12 @@ function OfficePage() {
           )}
         </div>
       )}
-      <div className="relative flex min-h-0 flex-1">
+      <div ref={containerRef} className="relative flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1">
           <Suspense fallback={<Skeleton className="m-6 h-[60vh]" />}>
             {kind === "docx" && (
               <DocxEditor
+                key={editorKey}
                 blob={blob}
                 name={file.name}
                 user={user}
@@ -410,6 +546,7 @@ function OfficePage() {
             )}
             {kind === "pdf" && (
               <PdfViewer
+                key={editorKey}
                 blob={blob}
                 name={file.name}
                 text={file.extracted_text ?? ""}
@@ -422,6 +559,7 @@ function OfficePage() {
             )}
             {kind === "xlsx" && (
               <SheetEditor
+                key={editorKey}
                 blob={blob}
                 name={file.name}
                 onDirty={onDirty}
@@ -445,21 +583,22 @@ function OfficePage() {
               aria-label="Resize assistant panel"
               aria-valuemin={PANEL_MIN}
               aria-valuemax={PANEL_MAX}
-              aria-valuenow={panelW}
+              aria-valuenow={width}
               tabIndex={0}
               className="hidden w-1 shrink-0 cursor-col-resize border-l bg-border/40 hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none md:block"
               onPointerDown={startResize}
               onKeyDown={(e) => {
-                if (e.key === "ArrowLeft") setPanelW((w) => clampW(w + 16));
-                if (e.key === "ArrowRight") setPanelW((w) => clampW(w - 16));
+                if (e.key === "ArrowLeft") setPanelW(clampW(width + 16, containerW));
+                if (e.key === "ArrowRight") setPanelW(clampW(width - 16, containerW));
               }}
             />
             <div
               className="absolute inset-y-0 right-0 z-20 w-full max-w-[26rem] border-l shadow-lg md:static md:z-auto md:max-w-none md:shadow-none"
-              style={isWide ? { width: panelW } : undefined}
+              style={isWide ? { width } : undefined}
             >
               <Suspense fallback={<div className="h-full bg-card" />}>
                 <DraftPanel
+                  key={file.id}
                   matterId={matter.id}
                   fileId={file.id}
                   fileName={file.name}

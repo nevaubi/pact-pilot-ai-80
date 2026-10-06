@@ -5,10 +5,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { logClientError } from "@/lib/error-log";
 import {
   applyWordEdits,
-  resolveReplaceTarget,
+  strictReceipt,
   type ApplyResult,
-  type MatchTarget,
   type WordEngine,
+  type WordStep,
 } from "@/lib/office-apply";
 import type { Proposal } from "@/lib/office-tools";
 
@@ -29,9 +29,17 @@ export type EditorHandle = {
    * Insert text at the cursor or replace the current selection. `anchor` is the text that was
    * selected when the attorney asked; if the live selection is gone, the editor locates it again.
    */
-  insert: (text: string, mode: "cursor" | "replace", anchor?: string) => Promise<InsertResult>;
-  /** Serialize the current document for saving. */
+  insert: (
+    text: string,
+    mode: "cursor" | "replace",
+    anchor?: string,
+    /** Spreadsheets: the sheet that was active when the attorney asked (legacy cell fences pin to it). */
+    askSheet?: string,
+  ) => Promise<InsertResult>;
+  /** Serialize the current document for saving (reserialized — callers use the original bytes when unchanged). */
   export: () => Promise<Blob>;
+  /** Called after a successful save with the bytes now stored, so later exports diff against them. */
+  markSaved?: (saved: Blob) => void;
   /** Apply a validated structured proposal (Word edits or sheet ops) after the attorney clicks Apply. */
   applyProposal?: (p: Proposal) => Promise<ApplyResult>;
   /** Spreadsheet snapshot (values + formulas) for the assistant's cell tools. */
@@ -54,15 +62,13 @@ type Props = {
 };
 
 type DocApi = NonNullable<NonNullable<SuperDocType["activeEditor"]>["doc"]>;
+type PlanInput = Parameters<DocApi["mutations"]["apply"]>[0];
+type PreviewInput = Parameters<DocApi["mutations"]["preview"]>[0];
+type MatchInput = Parameters<DocApi["query"]["match"]>[0];
+type InsertInput = Parameters<DocApi["insert"]>[0];
+type InsertOptions = NonNullable<Parameters<DocApi["insert"]>[1]>;
 
-const TRACKED = { changeMode: "tracked" } as const;
-
-function receipt(r: unknown): { success: boolean; message?: string } {
-  const x = r as { success?: boolean; failure?: { message?: string } } | undefined;
-  return x && x.success === false
-    ? { success: false, message: x.failure?.message || "The editor declined the change." }
-    : { success: true };
-}
+const TRACKED: InsertOptions = { changeMode: "tracked" };
 
 function plainError(e: unknown) {
   const m = e instanceof Error ? e.message : "";
@@ -73,33 +79,59 @@ function plainError(e: unknown) {
   return m || "The editor couldn't apply that change.";
 }
 
-/** SuperDoc Document API adapter: literal case-sensitive query.match targets and checked receipts, always tracked. */
-function wordEngine(d: DocApi): WordEngine {
+/**
+ * SuperDoc Document API adapter. Edits go through the native atomic mutation plan (preview, then
+ * apply with the previewed revision), always in tracked mode; matches are literal, case-sensitive and
+ * `exactlyOne`. Types come from the installed engine, so contract changes fail the type check.
+ */
+export function wordEngine(d: DocApi): WordEngine {
+  const steps = (s: WordStep[]): PlanInput["steps"] => s;
   return {
-    match: async (text) => {
-      const r = (await d.query.match({
+    revision: async () => String((await d.info({})).revision),
+    text: async () => String(await d.getText({})),
+    preview: async (s) => {
+      const input: PreviewInput = { atomic: true, changeMode: "tracked", steps: steps(s) };
+      const r = await d.mutations.preview(input);
+      return {
+        valid: r.valid === true,
+        evaluatedRevision: r.evaluatedRevision,
+        failures: r.failures?.map((f) => ({ stepId: f.stepId, message: f.message })),
+      };
+    },
+    apply: async (s, expectedRevision) => {
+      const input: PlanInput = {
+        atomic: true,
+        changeMode: "tracked",
+        expectedRevision,
+        steps: steps(s),
+      };
+      // Treat the receipt as untrusted shape: a missing or malformed receipt must fail, not throw past the check.
+      const r: unknown = await d.mutations.apply(input);
+      const x = (r && typeof r === "object" ? r : {}) as Partial<
+        Awaited<ReturnType<DocApi["mutations"]["apply"]>>
+      >;
+      return {
+        success: x.success,
+        ...(x.revision ? { revision: x.revision } : {}),
+        steps: Array.isArray(x.steps)
+          ? x.steps.map((s) => ({ stepId: s.stepId, effect: s.effect }))
+          : [],
+      };
+    },
+    count: async (text) => {
+      const q: MatchInput = {
         select: { type: "text", pattern: text, mode: "contains", caseSensitive: true },
-        limit: 2,
-      } as never)) as { total?: number; items?: { target?: MatchTarget }[] };
-      return { total: r?.total ?? r?.items?.length ?? 0, target: r?.items?.[0]?.target ?? null };
+        limit: 1,
+      };
+      const r = await d.query.match(q);
+      return r.total;
     },
-    selection: async () => {
-      const s = (await d.selection.current({ includeText: true } as never)) as
-        | {
-            empty?: boolean;
-            text?: string;
-            target?: MatchTarget | null;
-            selectionTarget?: MatchTarget | null;
-          }
-        | undefined;
-      if (!s || s.empty) return { text: "", target: s?.selectionTarget ?? s?.target ?? null };
-      return { text: s.text ?? "", target: s.selectionTarget ?? s.target ?? null };
-    },
-    replace: async (target, text) =>
-      receipt(await d.replace({ target, text } as never, TRACKED as never)),
-    insertAt: async (target, text) =>
-      receipt(await d.insert({ target, value: text, type: "text" } as never, TRACKED as never)),
   };
+}
+
+function strictOrThrow(r: unknown) {
+  const x = strictReceipt(r);
+  if (!x.ok) throw new Error(x.message);
 }
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -251,7 +283,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
         const d = doc();
         if (!d) return "";
         try {
-          const s = await d.selection.current({ includeText: true } as never);
+          const s = await d.selection.current({ includeText: true });
           return s && !s.empty ? (s.text ?? "") : "";
         } catch {
           return "";
@@ -265,32 +297,45 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
             ok: false,
             reason: "Switch to Editing or Suggesting first — the document is in view-only mode.",
           };
-        const eng = wordEngine(d);
         try {
           if (how === "replace") {
-            // The target is the passage captured when the attorney asked — never whatever is selected now.
-            const t = await resolveReplaceTarget(eng, anchor);
-            if ("reason" in t) return { ok: false, reason: t.reason };
-            const r = await eng.replace(t.target, text);
-            if (!r.success)
-              return { ok: false, reason: r.message ?? "The editor declined the change." };
-            onDirty();
+            // Identity is the exact passage captured at ask time, unique in the live document — never
+            // whatever is selected now, even if the live selection has the same text.
+            const find = anchor?.trim() ? anchor : "";
+            if (!find)
+              return {
+                ok: false,
+                reason:
+                  "Nothing was selected when you asked, so there is no passage to replace. Select it and ask again.",
+              };
+            const r = await applyWordEdits(wordEngine(d), [{ op: "replace", find, replace: text }]);
+            if (r.applied || ("partial" in r && r.partial)) onDirty();
+            if (!r.ok) return { ok: false, reason: r.reason };
             return {
               ok: true,
               tracked: true,
               how: "replace",
-              detail: "Replaced the passage you selected when you asked.",
+              detail: "Replaced the passage you selected when you asked (tracked).",
             };
           }
-          const s = await eng.selection();
-          let target = s.target;
+          const sel = await d.selection.current({ includeText: true });
+          const target = sel.selectionTarget ?? null;
+          if (!target)
+            return {
+              ok: false,
+              reason: "Click in the document where the text should go, then press Insert again.",
+            };
           // "Insert" with text highlighted inserts after it, never over it.
-          if (target && s.text && target.end) target = { ...target, start: target.end };
-          const r = target
-            ? await eng.insertAt(target, text)
-            : receipt(await d.insert({ value: text, type: "text" } as never, TRACKED as never));
-          if (!r.success)
-            return { ok: false, reason: r.message ?? "The editor declined the change." };
+          const at = sel.empty ? target : { ...target, start: target.end };
+          const input: InsertInput = { target: at, value: text, type: "text" };
+          const before = (await d.info({})).revision;
+          const r = strictReceipt(await d.insert(input, TRACKED));
+          if (!r.ok) return { ok: false, reason: r.message };
+          if ((await d.info({})).revision === before)
+            return {
+              ok: false,
+              reason: "The editor reported success but the document didn't change.",
+            };
           onDirty();
           return { ok: true, tracked: true, how: "cursor" };
         } catch (e) {
@@ -312,13 +357,24 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
             reason: "Switch to Editing or Suggesting first — the document is in view-only mode.",
             applied: 0,
           };
+        const before = (await d.info({})).revision;
         try {
           const r = await applyWordEdits(wordEngine(d), p.edits);
-          if (r.applied) onDirty();
+          if (r.applied || (!r.ok && r.partial)) onDirty();
           return r;
         } catch (e) {
           logClientError(e, "office", { kind: "docx", stage: "apply-proposal" });
-          return { ok: false, reason: plainError(e), applied: 0 };
+          const cur = doc();
+          const moved = cur ? (await cur.info({})).revision !== before : false;
+          if (moved) onDirty();
+          return {
+            ok: false,
+            reason: moved
+              ? `${plainError(e)} The document changed before the error — review the tracked changes.`
+              : plainError(e),
+            applied: 0,
+            ...(moved ? { partial: true } : {}),
+          };
         }
       },
       export: async () => {
@@ -332,13 +388,13 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
       acceptAllChanges: async () => {
         const d = doc();
         if (!d) return;
-        await d.trackChanges.decide({ decision: "accept", target: { kind: "all" } } as never);
+        strictOrThrow(await d.trackChanges.decide({ decision: "accept", target: { kind: "all" } }));
         onDirty();
       },
       rejectAllChanges: async () => {
         const d = doc();
         if (!d) return;
-        await d.trackChanges.decide({ decision: "reject", target: { kind: "all" } } as never);
+        strictOrThrow(await d.trackChanges.decide({ decision: "reject", target: { kind: "all" } }));
         onDirty();
       },
       focus: () => sdRef.current?.focus(),
