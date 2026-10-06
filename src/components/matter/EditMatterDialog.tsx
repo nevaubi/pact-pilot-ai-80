@@ -74,13 +74,15 @@ export function EditMatterDialog({
 
   async function remove() {
     await tryAction(async () => {
-      // Files live in storage; remove them first so nothing is orphaned.
+      // Files (and their kept versions) live in storage; remove them first so nothing is orphaned.
       const { data: files } = await supabase
         .from("files")
-        .select("path")
+        .select("id, path")
         .eq("matter_id", matter.id);
-      if (files?.length)
-        await supabase.storage.from("matter-files").remove(files.map((x) => x.path));
+      if (files?.length) {
+        const { storagePathsForFiles } = await import("@/lib/office");
+        await supabase.storage.from("matter-files").remove(await storagePathsForFiles(files));
+      }
       await mut(supabase.from("matters").delete().eq("id", matter.id).select("id"), {
         success: "Matter deleted",
       });

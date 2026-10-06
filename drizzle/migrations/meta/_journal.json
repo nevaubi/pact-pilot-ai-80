@@ -36,6 +36,20 @@
       "when": 1791299012260,
       "tag": "0004_office_file_versions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791301525370,
+      "tag": "0005_matter_files_update_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791303297505,
+      "tag": "0006_client_error_log",
+      "breakpoints": true
     }
   ]
 }

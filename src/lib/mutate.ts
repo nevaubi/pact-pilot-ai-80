@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { logClientError } from "@/lib/error-log";
 
 type Result = { data: unknown; error: { message: string } | null };
 
@@ -17,6 +18,9 @@ export async function mut<R extends Result>(
   const { data, error } = await p;
   if (error) {
     toast.error(opts.failure ?? "That didn't save", { description: humanize(error.message) });
+    logClientError(new Error(error.message), "save", {
+      action: opts.failure ?? opts.success ?? "write",
+    });
     throw new ToastedError(error.message);
   }
   if (opts.success) toast.success(opts.success);
@@ -47,5 +51,6 @@ export async function tryAction(fn: () => Promise<unknown>, failure = "That didn
   } catch (e) {
     if (e instanceof ToastedError) return;
     toast.error(failure, { description: humanize(e instanceof Error ? e.message : String(e)) });
+    logClientError(e, "save", { action: failure });
   }
 }

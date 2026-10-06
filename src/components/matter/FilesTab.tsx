@@ -31,7 +31,7 @@ import {
 import { toast } from "sonner";
 
 export const MAX_FILE_MB = 25;
-const ACCEPT = ".pdf,.docx,.txt,.md";
+const ACCEPT = ".pdf,.docx,.xlsx,.txt,.md";
 
 export async function uploadMatterFile(
   matterId: string | null,
@@ -93,7 +93,8 @@ export async function downloadFile(path: string, name?: string) {
 }
 
 export async function deleteFile(f: { id: string; path: string }) {
-  await supabase.storage.from("matter-files").remove([f.path]);
+  const { storagePathsForFiles } = await import("@/lib/office");
+  await supabase.storage.from("matter-files").remove(await storagePathsForFiles([f]));
   await mut(supabase.from("files").delete().eq("id", f.id).select("id"), {
     success: "File deleted",
   });
@@ -170,7 +171,7 @@ export function FilesTab({ matterId }: { matterId: string }) {
           {busy ?? "Drop deal documents here, or click to choose"}
         </p>
         <p className="text-xs text-muted-foreground">
-          PDF, Word (.docx) or text, up to {MAX_FILE_MB} MB. LOIs, agreements, questionnaires.
+          PDF, Word (.docx), Excel (.xlsx) or text, up to {MAX_FILE_MB} MB. LOIs, agreements, questionnaires, schedules.
         </p>
         <input
           type="file"

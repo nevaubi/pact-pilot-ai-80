@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader, Panel, EffortToggle, ListState } from "@/components/kit";
+import { ErrorLogPanel } from "@/components/settings/ErrorLogPanel";
 import { useEffort } from "@/hooks/use-effort";
 import { mut, tryAction } from "@/lib/mutate";
 import { Switch } from "@/components/ui/switch";
@@ -208,6 +209,7 @@ function Settings() {
             credits.
           </p>
         </Panel>
+        <ErrorLogPanel />
       </div>
     </div>
   );

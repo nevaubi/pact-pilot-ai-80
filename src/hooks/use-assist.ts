@@ -4,7 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Effort } from "@/components/kit";
 
 export type Usage = { inputTokens?: number | undefined; outputTokens?: number | undefined };
-export type SourceMeta = { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null };
+export type SourceMeta = {
+  ref: string;
+  authority_id: string;
+  citation: string;
+  title: string;
+  url: string;
+  version: string | null;
+};
 export type Turn = {
   id: string;
   q: string;
@@ -17,6 +24,8 @@ export type Turn = {
   retryable?: boolean | undefined;
   /** Short label shown instead of the raw prompt (quick actions). */
   label?: string | undefined;
+  /** Text selected in the open document when this was asked (draft mode); Replace re-anchors to it. */
+  anchor?: string | undefined;
 };
 
 /** What the open document contributes to a drafting request. Built lazily per send so it is always current. */
@@ -89,7 +98,9 @@ export function useAssist(o: {
 
   const patch = useCallback(
     (id: string, p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) =>
-      setTurns((ts) => ts.map((t) => (t.id === id ? { ...t, ...(typeof p === "function" ? p(t) : p) } : t))),
+      setTurns((ts) =>
+        ts.map((t) => (t.id === id ? { ...t, ...(typeof p === "function" ? p(t) : p) } : t)),
+      ),
     [],
   );
 
@@ -102,8 +113,19 @@ export function useAssist(o: {
         .filter((t) => t.status === "done" && t.id !== opts.replaceId)
         .slice(-6)
         .map(({ q, a }) => ({ q, a }));
-      const turn: Turn = { id, q: question, a: "", effort, status: "streaming", label: opts.label };
-      setTurns((ts) => (opts.replaceId ? ts.map((t) => (t.id === opts.replaceId ? turn : t)) : [...ts, turn]));
+      const anchor = docRef.current?.()?.selection?.trim() || undefined;
+      const turn: Turn = {
+        id,
+        q: question,
+        a: "",
+        effort,
+        status: "streaming",
+        label: opts.label,
+        anchor,
+      };
+      setTurns((ts) =>
+        opts.replaceId ? ts.map((t) => (t.id === opts.replaceId ? turn : t)) : [...ts, turn],
+      );
       setBusy(true);
       const controller = new AbortController();
       abortRef.current = controller;
@@ -127,7 +149,10 @@ export function useAssist(o: {
           signal: controller.signal,
         });
         if (!res.ok || !res.body) {
-          const j = (await res.json().catch(() => ({}))) as { message?: string; retryable?: boolean };
+          const j = (await res.json().catch(() => ({}))) as {
+            message?: string;
+            retryable?: boolean;
+          };
           patch(id, {
             status: "error",
             error: j.message ?? `AI request failed (${res.status}).`,
@@ -170,13 +195,20 @@ export function useAssist(o: {
         setTurns((ts) =>
           ts.map((t) =>
             t.id === id && t.status === "streaming"
-              ? { ...t, status: t.a ? "stopped" : "error", error: t.a ? undefined : "The connection dropped before an answer arrived." }
+              ? {
+                  ...t,
+                  status: t.a ? "stopped" : "error",
+                  error: t.a ? undefined : "The connection dropped before an answer arrived.",
+                }
               : t,
           ),
         );
       } catch (e) {
         if ((e as Error).name === "AbortError")
-          patch(id, (t) => ({ status: t.a ? "stopped" : "error", error: t.a ? undefined : "Stopped." }));
+          patch(id, (t) => ({
+            status: t.a ? "stopped" : "error",
+            error: t.a ? undefined : "Stopped.",
+          }));
         else patch(id, { status: "error", error: (e as Error).message, retryable: true });
       } finally {
         setBusy(false);

@@ -10,11 +10,16 @@ Priority order: (a) broken → (b) core non-AI flows → (c) AI desk → (d) pol
 - [ ] Compliance calendar generator (entity annual reports, UCC continuations) with authority links
 
 ## Ready (next pass)
+- [ ] Office: "Open in editor" from Templates and Drafts (convert a generated draft to .docx and open it)
+- [ ] Office: per-change accept/reject list in the header (SuperDoc `trackChanges.list()`), not only Accept all / Reject all
+- [ ] Office: PDF text selection → "Explain / Summarize selection" quick actions (selection is read-only today)
 - [ ] Semantic retrieval (embeddings) over the law library in addition to full-text search
 - [ ] Case-law search (CourtListener) surfaced in Sources with court filters; token optional for higher limits
 - [ ] Scheduled library refresh without opening the Library page
 
 ## Done
+- [x] Office fixes: DraftPanel effect-cleanup crash; AI proposals as tracked changes (Word), anchored Replace, `draft` fence parsing, cell assignments (Excel); Accept/Reject feedback; save/version/reload verified for Word, Excel and PDF
+- [x] Firm error log: `client_errors` + `logClientError`, root and Office error boundaries, every failed write, editor failures; reviewable/clearable under Settings
 - [x] OCR for scanned PDFs (browser Tesseract, auto on upload + "Read scanned text" button)
 - [x] Matter-level "Catch me up"; bulk closing checklist edits; 30-day Today reminders; matter summary export
 - [x] Core and AI flows browser-verified; AI hardening (friendly errors, bounded backoff, run-ID reuse, streaming Assist)
