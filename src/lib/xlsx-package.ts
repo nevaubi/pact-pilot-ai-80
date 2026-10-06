@@ -30,7 +30,8 @@ export type CellChange = {
   ref: string;
   row: number;
   col: number;
-  value: { kind: "text"; text: string } | { kind: "number"; n: number } | { kind: "bool"; b: boolean } | { kind: "formula"; f: string } | { kind: "empty" };
+  /** null = value untouched (formatting-only change). */
+  value: { kind: "text"; text: string } | { kind: "number"; n: number } | { kind: "bool"; b: boolean } | { kind: "formula"; f: string } | { kind: "empty" } | null;
   style: { bold?: boolean; fill?: string | null; align?: "left" | "center" | "right" | null; numFmt?: string | null } | null;
 };
 
@@ -131,7 +132,7 @@ export function diffWorkbooks(base: WorkbookData, cur: WorkbookData): CellChange
         ref,
         row: r + 1,
         col: col + 1,
-        value: valueChanged ? value : (null as never),
+        value: valueChanged ? value : null,
         style: styleChanged ? pickStyle(cs) : null,
       });
     }
