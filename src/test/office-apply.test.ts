@@ -13,7 +13,10 @@ import { assignmentsToOps } from "@/components/office/SheetEditor";
 import type { SheetOp } from "@/lib/office-tools";
 
 /** Fake native plan engine over a string. Applies steps atomically like SuperDoc's mutations.apply. */
-function fakeWord(initial: string, o: { throwAfterChange?: boolean; dropStep?: string; noReceipt?: boolean } = {}) {
+function fakeWord(
+  initial: string,
+  o: { throwAfterChange?: boolean; dropStep?: string; noReceipt?: boolean } = {},
+) {
   let doc = initial;
   let rev = 1;
   const count = (t: string) => doc.split(t).length - 1;
@@ -32,7 +35,8 @@ function fakeWord(initial: string, o: { throwAfterChange?: boolean; dropStep?: s
       if (expected !== String(rev)) throw new Error("REVISION_MISMATCH");
       const before = String(rev);
       for (const s of steps) {
-        if (s.op === "text.rewrite") doc = doc.replace(s.where.select.pattern, s.args.replacement.text);
+        if (s.op === "text.rewrite")
+          doc = doc.replace(s.where.select.pattern, s.args.replacement.text);
         if (s.op === "text.insert")
           doc = doc.replace(s.where.select.pattern, s.where.select.pattern + s.args.content.text);
         rev++;
@@ -42,7 +46,9 @@ function fakeWord(initial: string, o: { throwAfterChange?: boolean; dropStep?: s
       return {
         success: true,
         revision: { before, after: String(rev) },
-        steps: steps.filter((s) => s.id !== o.dropStep).map((s) => ({ stepId: s.id, effect: "changed" })),
+        steps: steps
+          .filter((s) => s.id !== o.dropStep)
+          .map((s) => ({ stepId: s.id, effect: "changed" })),
       };
     },
   };
@@ -55,13 +61,17 @@ describe("receipts", () => {
     expect(strictReceipt(null).ok).toBe(false);
     expect(strictReceipt({}).ok).toBe(false);
     expect(strictReceipt({ success: "yes" }).ok).toBe(false);
-    expect(strictReceipt({ success: false, failure: { message: "nope" } })).toEqual({ ok: false, message: "nope" });
+    expect(strictReceipt({ success: false, failure: { message: "nope" } })).toEqual({
+      ok: false,
+      message: "nope",
+    });
     expect(strictReceipt({ success: true }).ok).toBe(true);
   });
 });
 
 describe("Word apply (native atomic plan)", () => {
-  const text = "Seller shall deliver audited financial statements within ten (10) days. Buyer pays.";
+  const text =
+    "Seller shall deliver audited financial statements within ten (10) days. Buyer pays.";
   it("applies a validated batch in one plan with the previewed revision", async () => {
     const eng = fakeWord(text);
     const r = await applyWordEdits(eng, [
@@ -74,20 +84,26 @@ describe("Word apply (native atomic plan)", () => {
   });
   it("revalidates against the LIVE text: a stale anchor changes nothing", async () => {
     const eng = fakeWord(text.replace("ten (10) days", "fifteen days"));
-    const r = await applyWordEdits(eng, [{ op: "replace", find: "ten (10) days", replace: "five (5) days" }]);
+    const r = await applyWordEdits(eng, [
+      { op: "replace", find: "ten (10) days", replace: "five (5) days" },
+    ]);
     expect(r.ok).toBe(false);
     expect(eng.applies).toBe(0);
   });
   it("refuses a duplicated passage even if a selection has the same text", async () => {
     const eng = fakeWord("Buyer pays. Buyer pays.");
-    const r = await applyWordEdits(eng, [{ op: "replace", find: "Buyer pays.", replace: "Seller pays." }]);
+    const r = await applyWordEdits(eng, [
+      { op: "replace", find: "Buyer pays.", replace: "Seller pays." },
+    ]);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/2 times/);
     expect(eng.applies).toBe(0);
   });
   it("an exception after the document changed is reported as partial, never applied:0 clean", async () => {
     const eng = fakeWord(text, { throwAfterChange: true });
-    const r = await applyWordEdits(eng, [{ op: "replace", find: "ten (10) days", replace: "five (5) days" }]);
+    const r = await applyWordEdits(eng, [
+      { op: "replace", find: "ten (10) days", replace: "five (5) days" },
+    ]);
     expect(r).toMatchObject({ ok: false, partial: true });
   });
   it("a missing receipt or a step without a 'changed' outcome is not success", async () => {
@@ -105,20 +121,30 @@ describe("Word apply (native atomic plan)", () => {
     const eng = fakeWord(text);
     const spy = vi.spyOn(eng, "preview");
     await applyWordEdits(eng, [
-      { op: "format", find: "Buyer pays.", format: { bold: true, italic: null, underline: null, fontSize: 11, fontFamily: null } },
+      {
+        op: "format",
+        find: "Buyer pays.",
+        format: { bold: true, italic: null, underline: null, fontSize: 11, fontFamily: null },
+      },
     ]);
     const steps = spy.mock.calls[0]![0];
     expect(steps[0]).toEqual({
       id: "e1",
       op: "format.apply",
-      where: { by: "select", select: { type: "text", pattern: "Buyer pays.", mode: "contains", caseSensitive: true }, require: "exactlyOne" },
+      where: {
+        by: "select",
+        select: { type: "text", pattern: "Buyer pays.", mode: "contains", caseSensitive: true },
+        require: "exactlyOne",
+      },
       args: { inline: { bold: true, fontSize: 11 } },
     });
   });
 });
 
 /** Fake typed cell engine with an optional write/restore fault. */
-function fakeSheet(o: { failOn?: string; restoreFails?: boolean; clearKeepsFormula?: boolean } = {}) {
+function fakeSheet(
+  o: { failOn?: string; restoreFails?: boolean; clearKeepsFormula?: boolean } = {},
+) {
   const style = { numberFormat: null, bold: false, fill: null, align: null } as CellState["style"];
   const cells = new Map<string, CellState>();
   const k = (s: string, c: string) => `${s}!${c}`;
@@ -133,10 +159,29 @@ function fakeSheet(o: { failOn?: string; restoreFails?: boolean; clearKeepsFormu
       eng.writes++;
       if (o.failOn === c) throw new Error("engine refused");
       const prev = eng.read(s, c);
-      const st = { ...prev.style, ...(op.bold != null ? { bold: op.bold } : {}), ...(op.fill != null ? { fill: op.fill } : {}) };
+      const st = {
+        ...prev.style,
+        ...(op.bold != null ? { bold: op.bold } : {}),
+        ...(op.fill != null ? { fill: op.fill } : {}),
+      };
       const v =
-        op.type === "number" ? Number(op.value) : op.type === "boolean" ? op.value === "TRUE" : op.type === "clear" || op.type === "formula" ? null : op.type === "keep" ? prev.v : op.value;
-      const f = op.type === "formula" ? op.value : op.type === "clear" && o.clearKeepsFormula ? prev.f : op.type === "keep" ? prev.f : null;
+        op.type === "number"
+          ? Number(op.value)
+          : op.type === "boolean"
+            ? op.value === "TRUE"
+            : op.type === "clear" || op.type === "formula"
+              ? null
+              : op.type === "keep"
+                ? prev.v
+                : op.value;
+      const f =
+        op.type === "formula"
+          ? op.value
+          : op.type === "clear" && o.clearKeepsFormula
+            ? prev.f
+            : op.type === "keep"
+              ? prev.f
+              : null;
       cells.set(k(s, c), { v, f, style: st, raw: { v, f } });
     },
     restore: (s, c, prev) => {
@@ -168,7 +213,12 @@ describe("Sheet apply", () => {
     expect(r.ok).toBe(true);
     expect(eng.read("Main", "C1").v).toBe("00123");
     expect(eng.read("Main", "C2")).toMatchObject({ v: "=not a formula", f: null });
-    expect(verifyWrite({ sheet: "S", cell: "A1", type: "number", value: "123" }, { v: "123", f: null, style: eng.read("Main", "A1").style, raw: null })).toMatch(/did not take/);
+    expect(
+      verifyWrite(
+        { sheet: "S", cell: "A1", type: "number", value: "123" },
+        { v: "123", f: null, style: eng.read("Main", "A1").style, raw: null },
+      ),
+    ).toMatch(/did not take/);
   });
   it("rolls back and verifies the restore when a later write fails", () => {
     const eng = fakeSheet({ failOn: "A3" });
@@ -197,7 +247,9 @@ describe("Sheet apply", () => {
   });
   it("applies and verifies formatting-only ops", () => {
     const eng = fakeSheet();
-    const r = applySheetOps(eng, [{ sheet: "Main", cell: "A1", type: "keep", value: "", bold: true, fill: "#ffcc00" }]);
+    const r = applySheetOps(eng, [
+      { sheet: "Main", cell: "A1", type: "keep", value: "", bold: true, fill: "#ffcc00" },
+    ]);
     expect(r.ok).toBe(true);
     expect(eng.read("Main", "A1")).toMatchObject({ v: 5, style: { bold: true, fill: "#ffcc00" } });
   });

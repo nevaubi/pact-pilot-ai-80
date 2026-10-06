@@ -23,7 +23,10 @@ vi.mock("@/integrations/supabase/client", () => ({
     rpc: async (name: string, args: unknown) => {
       rpc.calls.push({ name, args });
       if (rpc.echo)
-        return { data: [{ path: (args as { p_new_path: string }).p_new_path, version_id: "v" }], error: null };
+        return {
+          data: [{ path: (args as { p_new_path: string }).p_new_path, version_id: "v" }],
+          error: null,
+        };
       return rpc.result;
     },
     storage: {
@@ -61,7 +64,10 @@ describe("use-assist ownership (P0-4)", () => {
     session.gate = new Promise<void>((r) => (open = r));
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const { result } = renderHook(() => useAssist({ matterId: "m", storeKey: "p1", effort: "normal" }), { wrapper });
+    const { result } = renderHook(
+      () => useAssist({ matterId: "m", storeKey: "p1", effort: "normal" }),
+      { wrapper },
+    );
     let p!: Promise<boolean>;
     act(() => void (p = result.current.send("q")));
     act(() => result.current.stop());
@@ -73,8 +79,14 @@ describe("use-assist ownership (P0-4)", () => {
 
   it("an empty successful stream is not a successful answer; step exhaustion says so", async () => {
     const s = controllable();
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(s.body)));
-    const { result } = renderHook(() => useAssist({ matterId: "m", storeKey: "p2", effort: "normal", flushMs: 5 }), { wrapper });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(s.body)),
+    );
+    const { result } = renderHook(
+      () => useAssist({ matterId: "m", storeKey: "p2", effort: "normal", flushMs: 5 }),
+      { wrapper },
+    );
     let p!: Promise<boolean>;
     act(() => void (p = result.current.send("q")));
     await waitFor(() => expect(result.current.busy).toBe(true));
@@ -89,8 +101,14 @@ describe("use-assist ownership (P0-4)", () => {
     const s1 = controllable();
     const s2 = controllable();
     const queue = [s1, s2];
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(queue.shift()!.body)));
-    const { result } = renderHook(() => useAssist({ matterId: "m", storeKey: "p3", effort: "normal", flushMs: 5 }), { wrapper });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(queue.shift()!.body)),
+    );
+    const { result } = renderHook(
+      () => useAssist({ matterId: "m", storeKey: "p3", effort: "normal", flushMs: 5 }),
+      { wrapper },
+    );
     let p1!: Promise<boolean>;
     act(() => void (p1 = result.current.send("first")));
     await waitFor(() => expect(result.current.busy).toBe(true));
@@ -115,11 +133,21 @@ describe("use-assist ownership (P0-4)", () => {
 describe("DraftPanel (P0-5)", () => {
   it("keeps text typed during a request and only clears what was sent", async () => {
     const s = controllable();
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(s.body)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(s.body)),
+    );
     const { DraftPanel } = await import("@/components/office/DraftPanel");
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    const editor = { current: { getText: async () => "", getSelection: async () => "", insert: vi.fn(), export: vi.fn() } } as never;
+    const editor = {
+      current: {
+        getText: async () => "",
+        getSelection: async () => "",
+        insert: vi.fn(),
+        export: vi.fn(),
+      },
+    } as never;
     render(
       <DraftPanel
         matterId="m"
@@ -145,13 +173,31 @@ describe("DraftPanel (P0-5)", () => {
 
   it("rejects an oversized batch of references up front", async () => {
     const { DraftPanel } = await import("@/components/office/DraftPanel");
-    const editor = { current: { getText: async () => "", getSelection: async () => "", insert: vi.fn(), export: vi.fn() } } as never;
+    const editor = {
+      current: {
+        getText: async () => "",
+        getSelection: async () => "",
+        insert: vi.fn(),
+        export: vi.fn(),
+      },
+    } as never;
     const { container } = render(
-      <DraftPanel matterId="m" fileId="k2" fileName="x.docx" kind="docx" canInsert editor={editor} getDoc={async () => ({ name: "x", kind: "docx" as const, text: "" })} />,
+      <DraftPanel
+        matterId="m"
+        fileId="k2"
+        fileName="x.docx"
+        kind="docx"
+        canInsert
+        editor={editor}
+        getDoc={async () => ({ name: "x", kind: "docx" as const, text: "" })}
+      />,
       { wrapper },
     );
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-    const files = Array.from({ length: 6 }, (_, i) => new File(["hello"], `r${i}.txt`, { type: "text/plain" }));
+    const files = Array.from(
+      { length: 6 },
+      (_, i) => new File(["hello"], `r${i}.txt`, { type: "text/plain" }),
+    );
     fireEvent.change(input, { target: { files } });
     expect(await screen.findByRole("alert")).toHaveTextContent(/at most 5 references/);
     expect(screen.queryByLabelText("Attached references")).toBeNull();
@@ -180,8 +226,13 @@ describe("conflict-safe save (11)", () => {
     });
   });
   it("a conflict removes only the just-uploaded object and raises SaveConflict", async () => {
-    rpc.result = { data: null, error: { code: "40001", message: "conflict: file changed since it was opened" } };
-    await expect(saveNewVersion(file, "m1/old.docx", new Blob(["x"]))).rejects.toBeInstanceOf(SaveConflict);
+    rpc.result = {
+      data: null,
+      error: { code: "40001", message: "conflict: file changed since it was opened" },
+    };
+    await expect(saveNewVersion(file, "m1/old.docx", new Blob(["x"]))).rejects.toBeInstanceOf(
+      SaveConflict,
+    );
     expect(rpc.removed).toEqual(rpc.uploads);
     expect(rpc.removed).not.toContain("m1/old.docx");
   });

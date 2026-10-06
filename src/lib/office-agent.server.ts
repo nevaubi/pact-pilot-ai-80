@@ -123,7 +123,12 @@ export async function withDeadline<T>(
           ctl.abort(new Error("deadline"));
           rej(new Error(`Tool timed out after ${ms / 1000}s.`));
         }, ms);
-        ctl.signal.addEventListener("abort", () => rej(new Error(parent?.aborted ? "Stopped." : `Tool timed out after ${ms / 1000}s.`)), { once: true });
+        ctl.signal.addEventListener(
+          "abort",
+          () =>
+            rej(new Error(parent?.aborted ? "Stopped." : `Tool timed out after ${ms / 1000}s.`)),
+          { once: true },
+        );
       }),
     ]);
   } finally {
@@ -246,9 +251,13 @@ export function buildOfficeTools(o: {
     const n = (perStep.get(st) ?? 0) + 1;
     perStep.set(st, n);
     if (calls > lim.maxCalls)
-      return budget.take({ error: `Tool call limit (${lim.maxCalls}) for this request reached. Answer from what you have.` });
+      return budget.take({
+        error: `Tool call limit (${lim.maxCalls}) for this request reached. Answer from what you have.`,
+      });
     if (n > lim.maxParallel)
-      return budget.take({ error: `At most ${lim.maxParallel} tool calls per round; this one was skipped.` });
+      return budget.take({
+        error: `At most ${lim.maxParallel} tool calls per round; this one was skipped.`,
+      });
     try {
       const v = await withDeadline(async (s) => fn(s), AGENT_LIMITS.toolMs, signal);
       return budget.take(v);

@@ -61,7 +61,11 @@ describe("document retrieval", () => {
   });
   it("tool budget returns valid JSON and never passes total − reserve with document data", () => {
     const b = new ToolBudget(1000);
-    const outs = [b.take({ t: "x".repeat(300) }), b.take({ t: "y".repeat(2000) }), b.take({ t: "z".repeat(50) })];
+    const outs = [
+      b.take({ t: "x".repeat(300) }),
+      b.take({ t: "y".repeat(2000) }),
+      b.take({ t: "z".repeat(50) }),
+    ];
     for (const o of outs) expect(() => JSON.parse(o)).not.toThrow();
     expect(JSON.parse(outs[1]!).truncated).toBe(true);
     expect(JSON.parse(outs[2]!).error).toMatch(/budget/);
@@ -163,8 +167,12 @@ describe("review findings (P0-1)", () => {
     expect(parseRange("B2")).toEqual({ r1: 2, r2: 2, c1: 2, c2: 2 });
   });
   it("rejects non-finite numbers like 1e999", () => {
-    expect(validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "number", value: "1e999" }]).ok).toBe(false);
-    expect(validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "number", value: "1e3" }]).ok).toBe(true);
+    expect(
+      validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "number", value: "1e999" }]).ok,
+    ).toBe(false);
+    expect(
+      validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "number", value: "1e3" }]).ok,
+    ).toBe(true);
   });
   it("formula comparison keeps string-literal case exact", () => {
     expect(sameFormula("=sum(a1:a2)", "=SUM(A1:A2)")).toBe(true);
@@ -184,18 +192,48 @@ describe("review findings (P0-1)", () => {
   it("validates Word formatting edits", () => {
     const doc = "ARTICLE 1 DEFINITIONS\nBody text.";
     const ok = validateWordEdits(doc, [
-      { op: "format", find: "ARTICLE 1 DEFINITIONS", format: { bold: true, italic: null, underline: null, fontSize: 12, fontFamily: "Times New Roman" } },
+      {
+        op: "format",
+        find: "ARTICLE 1 DEFINITIONS",
+        format: {
+          bold: true,
+          italic: null,
+          underline: null,
+          fontSize: 12,
+          fontFamily: "Times New Roman",
+        },
+      },
     ]);
     expect(ok.ok).toBe(true);
     const bad = validateWordEdits(doc, [
-      { op: "format", find: "Body text.", format: { bold: null, italic: null, underline: null, fontSize: 0.3, fontFamily: "<script>" } },
+      {
+        op: "format",
+        find: "Body text.",
+        format: {
+          bold: null,
+          italic: null,
+          underline: null,
+          fontSize: 0.3,
+          fontFamily: "<script>",
+        },
+      },
     ]);
     expect(bad.errors.join(" ")).toMatch(/font size/);
     expect(bad.errors.join(" ")).toMatch(/font family/);
   });
   it("validates sheet formatting ops", () => {
-    expect(validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "keep", value: "", fill: "#ffcc00", bold: true }]).ok).toBe(true);
-    expect(validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "keep", value: "" }]).ok).toBe(false);
-    expect(validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "keep", value: "", fill: "red" }]).ok).toBe(false);
+    expect(
+      validateSheetOps(
+        ["S"],
+        [{ sheet: "S", cell: "A1", type: "keep", value: "", fill: "#ffcc00", bold: true }],
+      ).ok,
+    ).toBe(true);
+    expect(validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "keep", value: "" }]).ok).toBe(
+      false,
+    );
+    expect(
+      validateSheetOps(["S"], [{ sheet: "S", cell: "A1", type: "keep", value: "", fill: "red" }])
+        .ok,
+    ).toBe(false);
   });
 });

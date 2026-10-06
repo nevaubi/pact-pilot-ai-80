@@ -93,7 +93,10 @@ export async function draftResponse(o: {
   // The overall deadline covers setup (matter context, sources) as well as the model loop.
   const internal = new AbortController();
   const overall = new AbortController();
-  const overallTimer = setTimeout(() => overall.abort(new Error("overall deadline")), lim.overallMs);
+  const overallTimer = setTimeout(
+    () => overall.abort(new Error("overall deadline")),
+    lim.overallMs,
+  );
   const signal = anySignal([request.signal, internal.signal, overall.signal]);
   const {
     provider,
@@ -145,12 +148,25 @@ export async function draftResponse(o: {
   }
   const noSources = {
     block: "",
-    meta: [] as { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null }[],
+    meta: [] as {
+      ref: string;
+      authority_id: string;
+      citation: string;
+      title: string;
+      url: string;
+      version: string | null;
+    }[],
   };
   const sources = trivial
     ? noSources
     : await raceSignal(
-        matterSources(auth.supabase, matterId, undefined, queriesFromText(`${question} ${doc?.selection ?? ""}`), effort),
+        matterSources(
+          auth.supabase,
+          matterId,
+          undefined,
+          queriesFromText(`${question} ${doc?.selection ?? ""}`),
+          effort,
+        ),
         signal,
       ).catch(() => noSources);
   if (signal.aborted) return fail(new Error("Stopped."));
@@ -191,7 +207,11 @@ export async function draftResponse(o: {
   // Transient 429/5xx before any output: bounded, abortable backoff. Tools are read-only and
   // proposals are only collected, so a retry never repeats a mutation.
   let result!: ReturnType<typeof runOfficeAgent>;
-  let it!: AsyncIterator<Awaited<ReturnType<typeof runOfficeAgent>["fullStream"]> extends AsyncIterable<infer P> ? P : never>;
+  let it!: AsyncIterator<
+    Awaited<ReturnType<typeof runOfficeAgent>["fullStream"]> extends AsyncIterable<infer P>
+      ? P
+      : never
+  >;
   let first!: IteratorResult<unknown>;
   for (let attempt = 0; ; attempt++) {
     proposals = [];
@@ -264,8 +284,13 @@ export async function draftResponse(o: {
             });
           else if (part.type === "tool-result") {
             const out = typeof part["output"] === "string" ? (part["output"] as string) : "";
-            emit({ t: "activity", id: part["toolCallId"], status: out.startsWith('{"error"') ? "error" : "done" });
-          } else if (part.type === "tool-error") emit({ t: "activity", id: part["toolCallId"], status: "error" });
+            emit({
+              t: "activity",
+              id: part["toolCallId"],
+              status: out.startsWith('{"error"') ? "error" : "done",
+            });
+          } else if (part.type === "tool-error")
+            emit({ t: "activity", id: part["toolCallId"], status: "error" });
           else if (part.type === "error") throw part["error"];
           cur = (await it.next()) as typeof cur;
         }
@@ -279,11 +304,20 @@ export async function draftResponse(o: {
         const usage = capped
           ? { inputTokens: undefined, outputTokens: undefined }
           : await result.totalUsage.then(
-              (u) => ({ inputTokens: u.inputTokens ?? undefined, outputTokens: u.outputTokens ?? undefined }),
+              (u) => ({
+                inputTokens: u.inputTokens ?? undefined,
+                outputTokens: u.outputTokens ?? undefined,
+              }),
               () => ({ inputTokens: undefined, outputTokens: undefined }),
             );
         const exhausted = lastFinish === "tool-calls";
-        emit({ t: "done", usage, runId: p.getRunId() ?? null, steps, ...(exhausted ? { exhausted: true } : {}) });
+        emit({
+          t: "done",
+          usage,
+          runId: p.getRunId() ?? null,
+          steps,
+          ...(exhausted ? { exhausted: true } : {}),
+        });
         // Logging must not hold up the answer.
         void logRun(auth.supabase, auth.userId, matterId, "draft", effort, usage).catch((e) =>
           console.error("[ai:draft:log]", e instanceof Error ? e.message : e),
@@ -291,7 +325,8 @@ export async function draftResponse(o: {
       } catch (e) {
         const timedOut = overall.signal.aborted;
         const err = toAiError(e);
-        if (err.status !== 499 || timedOut) console.error("[ai:draft:stream]", err.status ?? "", err.message);
+        if (err.status !== 499 || timedOut)
+          console.error("[ai:draft:stream]", err.status ?? "", err.message);
         emit({
           t: "error",
           message: timedOut

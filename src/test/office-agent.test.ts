@@ -88,7 +88,11 @@ describe("deadlines", () => {
   it("request abort propagates into the tool's signal", async () => {
     const parent = new AbortController();
     let seen: AbortSignal | undefined;
-    const p = withDeadline((sig) => ((seen = sig), new Promise((r) => setTimeout(r, 500))), 5000, parent.signal);
+    const p = withDeadline(
+      (sig) => ((seen = sig), new Promise((r) => setTimeout(r, 500))),
+      5000,
+      parent.signal,
+    );
     parent.abort();
     await expect(p).rejects.toThrow(/Stopped/);
     expect(seen?.aborted).toBe(true);
@@ -229,8 +233,11 @@ describe("office tool loop", () => {
   });
 
   it("forces a written answer in the last round and sends a real output-token cap", async () => {
-    const many = () => Array.from({ length: 6 }, () => toolStep([{ name: "get_outline", input: {} }]));
-    const model = new MockLanguageModelV4({ doStream: [...many().slice(0, 3), textStep("Final.")] as never });
+    const many = () =>
+      Array.from({ length: 6 }, () => toolStep([{ name: "get_outline", input: {} }]));
+    const model = new MockLanguageModelV4({
+      doStream: [...many().slice(0, 3), textStep("Final.")] as never,
+    });
     const { result } = setup(model, "normal");
     let text = "";
     for await (const p of result.fullStream) if (p.type === "text-delta") text += p.text;
@@ -245,7 +252,8 @@ describe("office tool loop", () => {
     const model = new MockLanguageModelV4({ doStream: [toolStep(calls), textStep("ok")] as never });
     const { result } = setup(model, "normal");
     const outs: string[] = [];
-    for await (const p of result.fullStream) if (p.type === "tool-result") outs.push(String(p.output));
+    for await (const p of result.fullStream)
+      if (p.type === "tool-result") outs.push(String(p.output));
     expect(outs.filter((o) => o.includes("per round")).length).toBe(3);
   });
 });

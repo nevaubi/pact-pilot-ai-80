@@ -15,7 +15,12 @@ export function officeKind(name: string): OfficeKind | null {
   return null;
 }
 
-export const KIND_LABEL: Record<OfficeKind, string> = { docx: "Word", pdf: "PDF", xlsx: "Spreadsheet", text: "Text" };
+export const KIND_LABEL: Record<OfficeKind, string> = {
+  docx: "Word",
+  pdf: "PDF",
+  xlsx: "Spreadsheet",
+  text: "Text",
+};
 
 export const MIME: Record<OfficeKind, string> = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -26,14 +31,18 @@ export const MIME: Record<OfficeKind, string> = {
 
 /** Short-lived signed URL for a private object in matter-files. */
 export async function signedUrl(path: string, seconds = 600) {
-  const { data, error } = await supabase.storage.from("matter-files").createSignedUrl(path, seconds);
-  if (error || !data?.signedUrl) throw new Error(error ? humanize(error.message) : "Couldn't open the file.");
+  const { data, error } = await supabase.storage
+    .from("matter-files")
+    .createSignedUrl(path, seconds);
+  if (error || !data?.signedUrl)
+    throw new Error(error ? humanize(error.message) : "Couldn't open the file.");
   return data.signedUrl;
 }
 
 export async function downloadBlob(path: string): Promise<Blob> {
   const { data, error } = await supabase.storage.from("matter-files").download(path);
-  if (error || !data) throw new Error(error ? humanize(error.message) : "Couldn't download the file.");
+  if (error || !data)
+    throw new Error(error ? humanize(error.message) : "Couldn't download the file.");
   return data;
 }
 
@@ -92,7 +101,9 @@ export async function saveNewVersion(
   }
   const row = Array.isArray(data) ? data[0] : data;
   if (!row || row.path !== newPath) {
-    throw new Error("The save could not be confirmed. Reload the file to check its current version.");
+    throw new Error(
+      "The save could not be confirmed. Reload the file to check its current version.",
+    );
   }
   return newPath;
 }
@@ -121,16 +132,33 @@ export async function restoreVersion(
 /** Every storage object that belongs to these files: current bytes plus all kept versions. */
 export async function storagePathsForFiles(files: { id: string; path: string }[]) {
   if (!files.length) return [] as string[];
-  const { data } = await supabase.from("file_versions").select("path").in("file_id", files.map((f) => f.id));
+  const { data } = await supabase
+    .from("file_versions")
+    .select("path")
+    .in(
+      "file_id",
+      files.map((f) => f.id),
+    );
   return Array.from(new Set([...files.map((f) => f.path), ...(data ?? []).map((v) => v.path)]));
 }
 
 /** Create a new matter file from raw bytes (used for drafts started from house templates). */
-export async function createMatterFile(matterId: string, name: string, blob: Blob, text: string | null) {
+export async function createMatterFile(
+  matterId: string,
+  name: string,
+  blob: Blob,
+  text: string | null,
+) {
   const path = `${matterId}/${crypto.randomUUID()}-${name.replace(/[^\w.-]+/g, "_")}`;
-  const { error } = await supabase.storage.from("matter-files").upload(path, blob, blob.type ? { contentType: blob.type } : undefined);
+  const { error } = await supabase.storage
+    .from("matter-files")
+    .upload(path, blob, blob.type ? { contentType: blob.type } : undefined);
   if (error) throw new Error(humanize(error.message));
-  const { data, error: e2 } = await supabase.from("files").insert({ matter_id: matterId, name, path, size: blob.size, extracted_text: text }).select().single();
+  const { data, error: e2 } = await supabase
+    .from("files")
+    .insert({ matter_id: matterId, name, path, size: blob.size, extracted_text: text })
+    .select()
+    .single();
   if (e2) {
     await supabase.storage.from("matter-files").remove([path]);
     throw new Error(humanize(e2.message));
@@ -142,17 +170,32 @@ export async function createMatterFile(matterId: string, name: string, blob: Blo
 
 /** Build a simple, cleanly formatted .docx from paragraphs of text. Blank lines separate paragraphs; a line in ALL CAPS becomes a heading. */
 export async function docxFromText(title: string, body: string): Promise<Blob> {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import("docx");
-  const paras = body.replace(/\r\n/g, "\n").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } =
+    await import("docx");
+  const paras = body
+    .replace(/\r\n/g, "\n")
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
   const children = [
-    new Paragraph({ heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, children: [new TextRun({ text: title })] }),
+    new Paragraph({
+      heading: HeadingLevel.TITLE,
+      alignment: AlignmentType.CENTER,
+      children: [new TextRun({ text: title })],
+    }),
     ...paras.map((p) => {
       const heading = p.length < 80 && /^[A-Z0-9 .,;:()&'’\-–—]+$/.test(p) && /[A-Z]/.test(p);
-      if (heading) return new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: p })] });
+      if (heading)
+        return new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          children: [new TextRun({ text: p })],
+        });
       const lines = p.split("\n");
       return new Paragraph({
         spacing: { after: 160, line: 300 },
-        children: lines.flatMap((l, i) => (i ? [new TextRun({ break: 1 }), new TextRun({ text: l })] : [new TextRun({ text: l })])),
+        children: lines.flatMap((l, i) =>
+          i ? [new TextRun({ break: 1 }), new TextRun({ text: l })] : [new TextRun({ text: l })],
+        ),
       });
     }),
   ];
@@ -160,7 +203,12 @@ export async function docxFromText(title: string, body: string): Promise<Blob> {
     creator: "Mirza",
     title,
     styles: { default: { document: { run: { font: "Times New Roman", size: 24 } } } },
-    sections: [{ properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } }, children }],
+    sections: [
+      {
+        properties: { page: { margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
+        children,
+      },
+    ],
   });
   const blob = await Packer.toBlob(doc);
   return new Blob([blob], { type: MIME.docx });
@@ -259,7 +307,8 @@ export async function xlsxToWorkbook(buf: ArrayBuffer, name: string): Promise<Wo
           const formula = fv.formula || (cell as unknown as { formula?: string }).formula;
           if (formula) cd.f = `=${formula}`;
           const res = fv.result;
-          if (typeof res === "number" || typeof res === "string" || typeof res === "boolean") cd.v = res;
+          if (typeof res === "number" || typeof res === "string" || typeof res === "boolean")
+            cd.v = res;
           else if (res instanceof Date) cd.v = serial(res);
         } else if (val instanceof Date) {
           cd.v = serial(val);
@@ -311,9 +360,15 @@ export async function xlsxToWorkbook(buf: ArrayBuffer, name: string): Promise<Wo
     for (const m of merges) {
       const mm = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(m);
       if (!mm) continue;
-      mergeData.push({ startColumn: colIndex(mm[1]!), startRow: Number(mm[2]) - 1, endColumn: colIndex(mm[3]!), endRow: Number(mm[4]) - 1 });
+      mergeData.push({
+        startColumn: colIndex(mm[1]!),
+        startRow: Number(mm[2]) - 1,
+        endColumn: colIndex(mm[3]!),
+        endRow: Number(mm[4]) - 1,
+      });
     }
-    const view = ws.views?.[0] as { state?: string; xSplit?: number; ySplit?: number; showGridLines?: boolean } | undefined;
+    const view = ws.views?.[0] as
+      { state?: string; xSplit?: number; ySplit?: number; showGridLines?: boolean } | undefined;
     const sd: SheetData = {
       id,
       name: ws.name,
@@ -327,17 +382,39 @@ export async function xlsxToWorkbook(buf: ArrayBuffer, name: string): Promise<Wo
       hidden: ws.state === "hidden" || ws.state === "veryHidden" ? 1 : 0,
     };
     if (view?.state === "frozen" && (view.xSplit || view.ySplit))
-      sd.freeze = { xSplit: view.xSplit ?? 0, ySplit: view.ySplit ?? 0, startRow: view.ySplit ?? 0, startColumn: view.xSplit ?? 0 };
+      sd.freeze = {
+        xSplit: view.xSplit ?? 0,
+        ySplit: view.ySplit ?? 0,
+        startRow: view.ySplit ?? 0,
+        startColumn: view.xSplit ?? 0,
+      };
     const tab = (ws.properties as { tabColor?: { argb?: string } } | undefined)?.tabColor?.argb;
     const tc = argbToRgb(tab);
     if (tc) sd.tabColor = tc;
     sheets[id] = sd;
   });
   if (!order.length) {
-    sheets["sheet-1"] = { id: "sheet-1", name: "Sheet1", rowCount: 100, columnCount: 26, cellData: {}, mergeData: [], columnData: {}, rowData: {} };
+    sheets["sheet-1"] = {
+      id: "sheet-1",
+      name: "Sheet1",
+      rowCount: 100,
+      columnCount: 26,
+      cellData: {},
+      mergeData: [],
+      columnData: {},
+      rowData: {},
+    };
     order.push("sheet-1");
   }
-  return { id: `wb-${crypto.randomUUID().slice(0, 8)}`, name, appVersion: "1.0.0", locale: "enUS", styles, sheetOrder: order, sheets };
+  return {
+    id: `wb-${crypto.randomUUID().slice(0, 8)}`,
+    name,
+    appVersion: "1.0.0",
+    locale: "enUS",
+    styles,
+    sheetOrder: order,
+    sheets,
+  };
 }
 
 /** Convert Univer workbook data back to an .xlsx Blob (values, formulas, basic styles, widths, merges, freeze). */
@@ -349,7 +426,17 @@ export async function workbookToXlsx(data: WorkbookData): Promise<Blob> {
     const sh = data.sheets[sid];
     if (!sh) continue;
     const ws = wb.addWorksheet(sh.name || sid, {
-      views: sh.freeze && (sh.freeze.xSplit || sh.freeze.ySplit) ? [{ state: "frozen", xSplit: sh.freeze.xSplit, ySplit: sh.freeze.ySplit, showGridLines: sh.showGridlines !== 0 }] : [{ showGridLines: sh.showGridlines !== 0 }],
+      views:
+        sh.freeze && (sh.freeze.xSplit || sh.freeze.ySplit)
+          ? [
+              {
+                state: "frozen",
+                xSplit: sh.freeze.xSplit,
+                ySplit: sh.freeze.ySplit,
+                showGridLines: sh.showGridlines !== 0,
+              },
+            ]
+          : [{ showGridLines: sh.showGridlines !== 0 }],
       state: sh.hidden ? "hidden" : "visible",
     });
     for (const [ci, col] of Object.entries(sh.columnData ?? {})) {
@@ -362,7 +449,11 @@ export async function workbookToXlsx(data: WorkbookData): Promise<Blob> {
       for (const [ci, cd] of Object.entries(cols ?? {})) {
         if (!cd) continue;
         const cell = ws.getCell(Number(ri) + 1, Number(ci) + 1);
-        if (cd.f) cell.value = { formula: cd.f.replace(/^=/, ""), result: cd.v as number | string | boolean | undefined } as never;
+        if (cd.f)
+          cell.value = {
+            formula: cd.f.replace(/^=/, ""),
+            result: cd.v as number | string | boolean | undefined,
+          } as never;
         else if (cd.v !== undefined) cell.value = cd.v;
         const s = typeof cd.s === "string" ? data.styles[cd.s] : (cd.s as StyleData | undefined);
         if (s) {
@@ -373,7 +464,12 @@ export async function workbookToXlsx(data: WorkbookData): Promise<Blob> {
           if (s.ff) font["name"] = s.ff;
           if (s.cl?.rgb) font["color"] = { argb: rgbToArgb(s.cl.rgb) };
           if (Object.keys(font).length) cell.font = font as never;
-          if (s.bg?.rgb) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rgbToArgb(s.bg.rgb) } };
+          if (s.bg?.rgb)
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: rgbToArgb(s.bg.rgb) },
+            };
           const align: Record<string, unknown> = {};
           if (s.ht === 2) align["horizontal"] = "center";
           else if (s.ht === 3) align["horizontal"] = "right";
@@ -384,7 +480,8 @@ export async function workbookToXlsx(data: WorkbookData): Promise<Blob> {
         }
       }
     }
-    for (const m of sh.mergeData ?? []) ws.mergeCells(m.startRow + 1, m.startColumn + 1, m.endRow + 1, m.endColumn + 1);
+    for (const m of sh.mergeData ?? [])
+      ws.mergeCells(m.startRow + 1, m.startColumn + 1, m.endRow + 1, m.endColumn + 1);
   }
   const out = await wb.xlsx.writeBuffer();
   return new Blob([out as ArrayBuffer], { type: MIME.xlsx });
@@ -397,10 +494,14 @@ export function workbookDataText(data: WorkbookData, maxChars = 300000) {
     const sh = data.sheets[sid];
     if (!sh) continue;
     parts.push(`### Sheet: ${sh.name}`);
-    const rows = Object.keys(sh.cellData ?? {}).map(Number).sort((a, b) => a - b);
+    const rows = Object.keys(sh.cellData ?? {})
+      .map(Number)
+      .sort((a, b) => a - b);
     for (const r of rows) {
       const cols = sh.cellData[r] ?? {};
-      const idxs = Object.keys(cols).map(Number).sort((a, b) => a - b);
+      const idxs = Object.keys(cols)
+        .map(Number)
+        .sort((a, b) => a - b);
       const last = idxs[idxs.length - 1] ?? -1;
       const cells: string[] = [];
       for (let c = 0; c <= last; c++) {

@@ -81,7 +81,7 @@ export function foldWithMap(text: string): { folded: string; map: Int32Array | n
   const parts: string[] = [];
   const map = new Int32Array(plain.length + 8);
   let k = 0;
-  for (let i = 0; i < text.length; ) {
+  for (let i = 0; i < text.length;) {
     const cp = text.codePointAt(i)!;
     const ch = String.fromCodePoint(cp);
     const low = ch.toLowerCase();
@@ -401,7 +401,11 @@ export function editTarget(e: WordEdit) {
 }
 export function hasFormat(f: WordFormat) {
   return (
-    f.bold != null || f.italic != null || f.underline != null || f.fontSize != null || f.fontFamily != null
+    f.bold != null ||
+    f.italic != null ||
+    f.underline != null ||
+    f.fontSize != null ||
+    f.fontFamily != null
   );
 }
 export function formatSummary(f: WordFormat) {
@@ -428,7 +432,8 @@ export function validateWordEdits(docText: string, edits: WordEdit[]): Validatio
   edits.slice(0, LIMITS.wordEdits).forEach((e, i) => {
     const target = editTarget(e);
     const n = i + 1;
-    if (typeof target !== "string" || !target.trim()) return void errors.push(`Edit ${n}: empty anchor.`);
+    if (typeof target !== "string" || !target.trim())
+      return void errors.push(`Edit ${n}: empty anchor.`);
     if (target.length > 4000)
       return void errors.push(`Edit ${n}: anchor longer than 4000 characters.`);
     if (e.op === "insert_after") {
@@ -443,10 +448,18 @@ export function validateWordEdits(docText: string, edits: WordEdit[]): Validatio
       const f = e.format;
       if (!f || !hasFormat(f)) errors.push(`Edit ${n}: no formatting to apply.`);
       else {
-        if (f.fontSize != null && (!Number.isFinite(f.fontSize) || f.fontSize < 1 || f.fontSize > 400 || Math.round(f.fontSize * 2) !== f.fontSize * 2))
+        if (
+          f.fontSize != null &&
+          (!Number.isFinite(f.fontSize) ||
+            f.fontSize < 1 ||
+            f.fontSize > 400 ||
+            Math.round(f.fontSize * 2) !== f.fontSize * 2)
+        )
           errors.push(`Edit ${n}: font size must be 1–400 pt in half-point steps.`);
         if (f.fontFamily != null && !FONT_FAMILY.test(f.fontFamily))
-          errors.push(`Edit ${n}: font family must be a plain font name (letters, digits, spaces).`);
+          errors.push(
+            `Edit ${n}: font family must be a plain font name (letters, digits, spaces).`,
+          );
       }
     }
     const c = countLiteral(docText, target);
@@ -488,7 +501,9 @@ export function validateSheetOps(sheetNames: string[], ops: SheetOp[]): Validati
     if (o.type === "number") {
       const t = o.value.trim();
       if (!NUMBER.test(t) || !Number.isFinite(Number(t)))
-        errors.push(`${n}: "${o.value}" is not a finite plain number (no currency symbols or commas).`);
+        errors.push(
+          `${n}: "${o.value}" is not a finite plain number (no currency symbols or commas).`,
+        );
     }
     if (o.type === "formula" && (!o.value.startsWith("=") || o.value.length < 2))
       errors.push(`${n}: formula must start with "=".`);
@@ -496,11 +511,23 @@ export function validateSheetOps(sheetNames: string[], ops: SheetOp[]): Validati
       errors.push(`${n}: boolean must be TRUE or FALSE.`);
     if (o.value.length > 32_767)
       errors.push(`${n}: longer than Excel's 32,767-character cell limit.`);
-    if (o.numberFormat != null && (o.numberFormat.length > 64 || !o.numberFormat.trim() || /[\u0000-\u001f]/.test(o.numberFormat)))
+    if (
+      o.numberFormat != null &&
+      (o.numberFormat.length > 64 ||
+        !o.numberFormat.trim() ||
+        /[\u0000-\u001f]/.test(o.numberFormat))
+    )
       errors.push(`${n}: number format must be 1–64 printable characters.`);
     if (o.fill != null && !HEX.test(o.fill)) errors.push(`${n}: fill must be a #RRGGBB colour.`);
-    if (o.align != null && !SHEET_ALIGN.includes(o.align)) errors.push(`${n}: align must be left, center or right.`);
-    if (o.type === "keep" && o.numberFormat == null && o.bold == null && o.fill == null && o.align == null)
+    if (o.align != null && !SHEET_ALIGN.includes(o.align))
+      errors.push(`${n}: align must be left, center or right.`);
+    if (
+      o.type === "keep" &&
+      o.numberFormat == null &&
+      o.bold == null &&
+      o.fill == null &&
+      o.align == null
+    )
       errors.push(`${n}: "keep" needs at least one format change.`);
   });
   return { ok: errors.length === 0, errors };
@@ -590,7 +617,8 @@ export class ToolBudget {
     let lo = 0;
     let hi = Math.min(full.length, room);
     let best = shell("");
-    if (best.length > room) return this.left >= exhausted.length ? this.charge(exhausted) : exhausted;
+    if (best.length > room)
+      return this.left >= exhausted.length ? this.charge(exhausted) : exhausted;
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
       const cand = shell(full.slice(0, mid));

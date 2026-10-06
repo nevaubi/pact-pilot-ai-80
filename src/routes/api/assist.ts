@@ -14,10 +14,16 @@ const MAX_WORKBOOK_TEXT = 1_000_000;
 const MAX_ATTACHMENT_TOTAL = 400_000;
 
 /** Read at most `max` bytes; a larger body is refused before it is fully buffered. */
-async function readBody(request: Request, max: number): Promise<{ json: unknown } | { status: number; message: string }> {
+async function readBody(
+  request: Request,
+  max: number,
+): Promise<{ json: unknown } | { status: number; message: string }> {
   const declared = Number(request.headers.get("content-length") ?? "");
   if (Number.isFinite(declared) && declared > max)
-    return { status: 413, message: `Request too large (${Math.round(declared / 1e6)} MB; limit ${max / 1e6} MB). Attach fewer or smaller references.` };
+    return {
+      status: 413,
+      message: `Request too large (${Math.round(declared / 1e6)} MB; limit ${max / 1e6} MB). Attach fewer or smaller references.`,
+    };
   const reader = request.body?.getReader();
   if (!reader) return { status: 400, message: "Invalid request." };
   const chunks: Uint8Array[] = [];
@@ -28,7 +34,10 @@ async function readBody(request: Request, max: number): Promise<{ json: unknown 
     size += value.byteLength;
     if (size > max) {
       await reader.cancel().catch(() => {});
-      return { status: 413, message: `Request too large (limit ${max / 1e6} MB). Attach fewer or smaller references.` };
+      return {
+        status: 413,
+        message: `Request too large (limit ${max / 1e6} MB). Attach fewer or smaller references.`,
+      };
     }
     chunks.push(value);
   }
@@ -45,77 +54,85 @@ async function readBody(request: Request, max: number): Promise<{ json: unknown 
   }
 }
 
-const bodyZ = z.object({
-  matterId: z.string().uuid(),
-  effort: z.enum(["normal", "advanced"]),
-  question: z.string().min(1).max(4000),
-  history: z
-    .array(z.object({ q: z.string().max(4000), a: z.string().max(20000) }))
-    .max(8)
-    .optional(),
-  runId: z.string().max(200).optional(),
-  /** "draft" = Office drafting panel: the open document is the primary context. */
-  mode: z.enum(["assist", "draft"]).optional(),
-  document: z
-    .object({
-      name: z.string().max(300),
-      kind: z.enum(["docx", "pdf", "xlsx", "text"]),
-      text: z.string().max(400_000),
-      selection: z.string().max(20_000).optional(),
-      workbook: z
-        .object({
-          active: z.string().max(200).optional(),
-          selection: z.object({ sheet: z.string().max(200), range: z.string().max(40) }).optional(),
-          sheets: z
-            .array(
-              z.object({
-                name: z.string().max(200),
-                cells: z.record(
-                  z.string().max(12),
-                  z.object({
-                    v: z
-                      .union([z.string().max(32_767), z.number(), z.boolean(), z.null()])
-                      .optional(),
-                    f: z.string().max(8_192).optional(),
-                  }),
-                ),
-              }),
-            )
-            .max(50),
-        })
-        .optional(),
-    })
-    .optional(),
-  /** Reference documents attached in the drafting panel for this request only (extracted in the browser). */
-  attachments: z
-    .array(
-      z.object({
-        id: z.string().max(64),
+const bodyZ = z
+  .object({
+    matterId: z.string().uuid(),
+    effort: z.enum(["normal", "advanced"]),
+    question: z.string().min(1).max(4000),
+    history: z
+      .array(z.object({ q: z.string().max(4000), a: z.string().max(20000) }))
+      .max(8)
+      .optional(),
+    runId: z.string().max(200).optional(),
+    /** "draft" = Office drafting panel: the open document is the primary context. */
+    mode: z.enum(["assist", "draft"]).optional(),
+    document: z
+      .object({
         name: z.string().max(300),
-        text: z.string().max(200_000),
-        truncated: z.boolean(),
-      }),
-    )
-    .max(5)
-    .optional(),
-}).superRefine((b, ctx) => {
-  // Aggregates are validated here, before any tool context is built — never silently sliced later.
-  const hist = (b.history ?? []).reduce((n, t) => n + t.q.length + t.a.length, 0);
-  if (hist > MAX_HISTORY_CHARS) ctx.addIssue({ code: "custom", message: "Conversation history too long." });
-  const att = (b.attachments ?? []).reduce((n, a) => n + a.text.length, 0);
-  if (att > MAX_ATTACHMENT_TOTAL)
-    ctx.addIssue({ code: "custom", message: `References total ${att} characters; the limit is ${MAX_ATTACHMENT_TOTAL}.` });
-  const sheets = b.document?.workbook?.sheets ?? [];
-  let cells = 0;
-  let text = 0;
-  for (const sh of sheets)
-    for (const c of Object.values(sh.cells)) {
-      cells++;
-      text += (typeof c.v === "string" ? c.v.length : 0) + (c.f?.length ?? 0);
-    }
-  if (cells > MAX_WORKBOOK_CELLS || text > MAX_WORKBOOK_TEXT)
-    ctx.addIssue({ code: "custom", message: "Workbook snapshot too large." });
-});
+        kind: z.enum(["docx", "pdf", "xlsx", "text"]),
+        text: z.string().max(400_000),
+        selection: z.string().max(20_000).optional(),
+        workbook: z
+          .object({
+            active: z.string().max(200).optional(),
+            selection: z
+              .object({ sheet: z.string().max(200), range: z.string().max(40) })
+              .optional(),
+            sheets: z
+              .array(
+                z.object({
+                  name: z.string().max(200),
+                  cells: z.record(
+                    z.string().max(12),
+                    z.object({
+                      v: z
+                        .union([z.string().max(32_767), z.number(), z.boolean(), z.null()])
+                        .optional(),
+                      f: z.string().max(8_192).optional(),
+                    }),
+                  ),
+                }),
+              )
+              .max(50),
+          })
+          .optional(),
+      })
+      .optional(),
+    /** Reference documents attached in the drafting panel for this request only (extracted in the browser). */
+    attachments: z
+      .array(
+        z.object({
+          id: z.string().max(64),
+          name: z.string().max(300),
+          text: z.string().max(200_000),
+          truncated: z.boolean(),
+        }),
+      )
+      .max(5)
+      .optional(),
+  })
+  .superRefine((b, ctx) => {
+    // Aggregates are validated here, before any tool context is built — never silently sliced later.
+    const hist = (b.history ?? []).reduce((n, t) => n + t.q.length + t.a.length, 0);
+    if (hist > MAX_HISTORY_CHARS)
+      ctx.addIssue({ code: "custom", message: "Conversation history too long." });
+    const att = (b.attachments ?? []).reduce((n, a) => n + a.text.length, 0);
+    if (att > MAX_ATTACHMENT_TOTAL)
+      ctx.addIssue({
+        code: "custom",
+        message: `References total ${att} characters; the limit is ${MAX_ATTACHMENT_TOTAL}.`,
+      });
+    const sheets = b.document?.workbook?.sheets ?? [];
+    let cells = 0;
+    let text = 0;
+    for (const sh of sheets)
+      for (const c of Object.values(sh.cells)) {
+        cells++;
+        text += (typeof c.v === "string" ? c.v.length : 0) + (c.f?.length ?? 0);
+      }
+    if (cells > MAX_WORKBOOK_CELLS || text > MAX_WORKBOOK_TEXT)
+      ctx.addIssue({ code: "custom", message: "Workbook snapshot too large." });
+  });
 
 /** Character budget for the open document per effort (the matter's other files still come through matterContext). */
 const DOC_BUDGET = { normal: 24_000, advanced: 90_000 } as const;
@@ -139,11 +156,16 @@ export const Route = createFileRoute("/api/assist")({
         if (!auth) return Response.json({ message: "Please sign in again." }, { status: 401 });
 
         const raw = await readBody(request, MAX_BODY_BYTES);
-        if ("status" in raw) return Response.json({ message: raw.message, retryable: false }, { status: raw.status });
+        if ("status" in raw)
+          return Response.json({ message: raw.message, retryable: false }, { status: raw.status });
         const parsed = bodyZ.safeParse(raw.json);
         if (!parsed.success)
           return Response.json(
-            { message: parsed.error.issues.find((i) => i.code === "custom")?.message ?? "Invalid request.", retryable: false },
+            {
+              message:
+                parsed.error.issues.find((i) => i.code === "custom")?.message ?? "Invalid request.",
+              retryable: false,
+            },
             { status: parsed.error.issues.some((i) => i.code === "custom") ? 413 : 400 },
           );
         const { matterId, effort, question, history, runId, document: doc } = parsed.data;

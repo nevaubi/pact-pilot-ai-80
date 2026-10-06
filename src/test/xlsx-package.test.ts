@@ -37,8 +37,14 @@ async function fixture(o: { date1904?: boolean } = {}) {
   const buf = (await wb.xlsx.writeBuffer()) as ArrayBuffer;
   // Parts ExcelJS can't author: a chart and a custom XML part must survive untouched.
   const zip = await JSZip.loadAsync(buf);
-  zip.file("xl/charts/chart1.xml", '<?xml version="1.0"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><!-- keep me --></c:chartSpace>');
-  zip.file("customXml/item1.xml", '<?xml version="1.0"?><firm:meta xmlns:firm="urn:firm">Matter 2026-014</firm:meta>');
+  zip.file(
+    "xl/charts/chart1.xml",
+    '<?xml version="1.0"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><!-- keep me --></c:chartSpace>',
+  );
+  zip.file(
+    "customXml/item1.xml",
+    '<?xml version="1.0"?><firm:meta xmlns:firm="urn:firm">Matter 2026-014</firm:meta>',
+  );
   return (await zip.generateAsync({ type: "arraybuffer" })) as ArrayBuffer;
 }
 
@@ -53,10 +59,12 @@ const setCell = (d: WorkbookData, sheet: string, r: number, c: number, v: C) => 
 async function entries(buf: ArrayBuffer | Blob) {
   const zip = await JSZip.loadAsync(buf instanceof Blob ? await ab(buf) : buf);
   const out = new Map<string, Uint8Array>();
-  for (const [name, f] of Object.entries(zip.files)) if (!f.dir) out.set(name, await f.async("uint8array"));
+  for (const [name, f] of Object.entries(zip.files))
+    if (!f.dir) out.set(name, await f.async("uint8array"));
   return out;
 }
-const same = (a?: Uint8Array, b?: Uint8Array) => !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
+const same = (a?: Uint8Array, b?: Uint8Array) =>
+  !!a && !!b && a.length === b.length && a.every((x, i) => x === b[i]);
 
 describe("XLSX original-package saving", () => {
   it("an unedited workbook diffs to no changes (caller returns the exact original bytes)", async () => {
@@ -80,7 +88,13 @@ describe("XLSX original-package saving", () => {
     const touched = new Set(["xl/worksheets/sheet1.xml", "xl/worksheets/sheet2.xml"]);
     for (const [name, bytes] of before)
       if (!touched.has(name)) expect(same(bytes, after.get(name)), `${name} changed`).toBe(true);
-    for (const keep of ["xl/charts/chart1.xml", "customXml/item1.xml", "xl/styles.xml", "xl/workbook.xml", "xl/sharedStrings.xml"])
+    for (const keep of [
+      "xl/charts/chart1.xml",
+      "customXml/item1.xml",
+      "xl/styles.xml",
+      "xl/workbook.xml",
+      "xl/sharedStrings.xml",
+    ])
       if (before.has(keep)) expect(same(before.get(keep), after.get(keep))).toBe(true);
     expect([...before.keys()].some((n) => /comments/.test(n))).toBe(true);
     const re = new ExcelJS.Workbook();
@@ -111,8 +125,13 @@ describe("XLSX original-package saving", () => {
     setCell(cur, "Deal", 2, 0, { v: "Fee", s: { bl: 1, bg: { rgb: "#ffcc00" } } });
     const before = await (await JSZip.loadAsync(buf)).file("xl/styles.xml")!.async("string");
     const out = await patchXlsx(buf, diffWorkbooks(base, cur));
-    const after = await (await JSZip.loadAsync(await ab(out))).file("xl/styles.xml")!.async("string");
-    const count = (x: string, tag: string) => (x.match(new RegExp(`<${tag}[ >]`, "g")) ?? []).length;
+    const after = await (
+      await JSZip.loadAsync(await ab(out))
+    )
+      .file("xl/styles.xml")!
+      .async("string");
+    const count = (x: string, tag: string) =>
+      (x.match(new RegExp(`<${tag}[ >]`, "g")) ?? []).length;
     expect(count(after, "xf")).toBe(count(before, "xf") + 1);
     expect(count(after, "font")).toBe(count(before, "font") + 1);
     const re = new ExcelJS.Workbook();
@@ -138,7 +157,12 @@ describe("XLSX original-package saving", () => {
     renamed.sheets[renamed.sheetOrder[1]!]!.name = "Renamed";
     expect(() => diffWorkbooks(base, renamed)).toThrow(XlsxUnsupported);
     const merged = structuredClone(base);
-    merged.sheets[merged.sheetOrder[0]!]!.mergeData.push({ startRow: 5, endRow: 5, startColumn: 0, endColumn: 1 });
+    merged.sheets[merged.sheetOrder[0]!]!.mergeData.push({
+      startRow: 5,
+      endRow: 5,
+      startColumn: 0,
+      endColumn: 1,
+    });
     expect(() => diffWorkbooks(base, merged)).toThrow(/Merged/);
   });
 
@@ -153,12 +177,16 @@ describe("XLSX original-package saving", () => {
   it("refuses macro, encrypted and zip-bomb-shaped packages", async () => {
     const zip = await JSZip.loadAsync(await fixture());
     zip.file("xl/vbaProject.bin", new Uint8Array([1, 2, 3]));
-    await expect(openPackage((await zip.generateAsync({ type: "arraybuffer" })) as ArrayBuffer)).rejects.toThrow(/Macro/);
+    await expect(
+      openPackage((await zip.generateAsync({ type: "arraybuffer" })) as ArrayBuffer),
+    ).rejects.toThrow(/Macro/);
     const cfb = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]).buffer;
     await expect(openPackage(cfb)).rejects.toThrow(/encrypted/);
     const many = new JSZip();
     many.file("[Content_Types].xml", "<Types/>");
     for (let i = 0; i < 2001; i++) many.file(`x/${i}.xml`, "<a/>");
-    await expect(openPackage((await many.generateAsync({ type: "arraybuffer" })) as ArrayBuffer)).rejects.toThrow(/too many/);
+    await expect(
+      openPackage((await many.generateAsync({ type: "arraybuffer" })) as ArrayBuffer),
+    ).rejects.toThrow(/too many/);
   });
 });

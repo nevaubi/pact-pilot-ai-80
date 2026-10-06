@@ -88,7 +88,11 @@ export async function extractWithCoverage(file: File, maxPages = 80): Promise<Ex
     const full = workbookDataText(data, 2_000_000);
     const cap = 300_000;
     return full.length > cap
-      ? { text: full.slice(0, cap), complete: false, note: `first ${cap / 1000}k characters of the workbook` }
+      ? {
+          text: full.slice(0, cap),
+          complete: false,
+          note: `first ${cap / 1000}k characters of the workbook`,
+        }
       : { text: full, complete: true, note: null };
   }
   return { text: await extractText(file, maxPages), complete: true, note: null };
@@ -126,7 +130,10 @@ export async function ocrPdf(
   } finally {
     await ocr.terminate();
   }
-  return pages.join("\n\n").replace(/[ \t]+\n/g, "\n").trim();
+  return pages
+    .join("\n\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
 }
 
 /** Template blanks: [[Field Name]] or {{Field Name}} */

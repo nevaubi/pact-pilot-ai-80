@@ -99,7 +99,12 @@ export function wordEngine(d: DocApi): WordEngine {
       };
     },
     apply: async (s, expectedRevision) => {
-      const input: PlanInput = { atomic: true, changeMode: "tracked", expectedRevision, steps: steps(s) };
+      const input: PlanInput = {
+        atomic: true,
+        changeMode: "tracked",
+        expectedRevision,
+        steps: steps(s),
+      };
       const r = await d.mutations.apply(input);
       return {
         success: r.success,
@@ -321,7 +326,10 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           const r = strictReceipt(await d.insert(input, TRACKED));
           if (!r.ok) return { ok: false, reason: r.message };
           if ((await d.info({})).revision === before)
-            return { ok: false, reason: "The editor reported success but the document didn't change." };
+            return {
+              ok: false,
+              reason: "The editor reported success but the document didn't change.",
+            };
           onDirty();
           return { ok: true, tracked: true, how: "cursor" };
         } catch (e) {

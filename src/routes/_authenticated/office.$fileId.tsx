@@ -44,7 +44,10 @@ const PANEL_MAX = 640;
 /** The editor always keeps at least this much width, so the panel can't crowd it out at 768–1024px. */
 const EDITOR_MIN = 420;
 const clampW = (w: number, container: number) =>
-  Math.max(PANEL_MIN, Math.min(PANEL_MAX, Math.max(PANEL_MIN, container - EDITOR_MIN), Math.round(w)));
+  Math.max(
+    PANEL_MIN,
+    Math.min(PANEL_MAX, Math.max(PANEL_MIN, container - EDITOR_MIN), Math.round(w)),
+  );
 function readStored(key: string) {
   try {
     return localStorage.getItem(key);
@@ -278,7 +281,9 @@ function OfficeFile({ fileId }: { fileId: string }) {
       const out = await ed.export();
       const text = kind === "pdf" ? undefined : (await ed.getText()).slice(0, 300000) || null;
       if (rev.current !== at) {
-        toast.error("You edited while the file was being prepared. Nothing was saved — press Save again.");
+        toast.error(
+          "You edited while the file was being prepared. Nothing was saved — press Save again.",
+        );
         return;
       }
       const newPath = await saveNewVersion(file, basePath.current!, out, {
@@ -316,7 +321,7 @@ function OfficeFile({ fileId }: { fileId: string }) {
       // Unchanged since load/save: hand back the exact stored bytes, never a reserialised copy.
       const out =
         rev.current === savedRev.current || !editor.current
-          ? baseBlob.current ?? blob
+          ? (baseBlob.current ?? blob)
           : await editor.current.export();
       saveBlobLocally(out, file.name);
     } catch (e) {
@@ -330,7 +335,9 @@ function OfficeFile({ fileId }: { fileId: string }) {
   async function restore(v: NonNullable<typeof versionsQ.data>[number]) {
     if (
       rev.current !== savedRev.current &&
-      !window.confirm("Restoring replaces the open document and discards your unsaved changes. Continue?")
+      !window.confirm(
+        "Restoring replaces the open document and discards your unsaved changes. Continue?",
+      )
     )
       return;
     if (saveLock.current) return;
@@ -454,7 +461,9 @@ function OfficeFile({ fileId }: { fileId: string }) {
           variant="ghost"
           className="h-7 text-xs"
           onClick={() => void download()}
-          title={dirty ? "Download your edited copy" : "Download the saved file (exact original bytes)"}
+          title={
+            dirty ? "Download your edited copy" : "Download the saved file (exact original bytes)"
+          }
         >
           <Download className="mr-1 h-3.5 w-3.5" />
           Download

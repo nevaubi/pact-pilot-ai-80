@@ -239,7 +239,10 @@ export function DraftPanel({
   busyRef.current = busy;
 
   const ask = useCallback(
-    async (prompt: string, o: { label?: string; needsSel?: boolean; onStart?: () => void } = {}) => {
+    async (
+      prompt: string,
+      o: { label?: string; needsSel?: boolean; onStart?: () => void } = {},
+    ) => {
       if (busyRef.current || prepLock.current) return false;
       prepLock.current = true;
       const myGen = gen.current;
@@ -308,7 +311,8 @@ export function DraftPanel({
         `You can attach at most ${LIMITS.attachments} references (${have} attached, ${files.length} selected).`,
       );
     for (const f of files) {
-      if (!EXT.test(f.name)) problems.push(`${f.name}: unsupported type (PDF, .docx, .xlsx, .txt, .md).`);
+      if (!EXT.test(f.name))
+        problems.push(`${f.name}: unsupported type (PDF, .docx, .xlsx, .txt, .md).`);
       else if (f.size > LIMITS.attachmentBytes)
         problems.push(
           `${f.name} is ${(f.size / 1048576).toFixed(1)} MB — the limit is ${LIMITS.attachmentBytes / 1048576} MB.`,
@@ -327,16 +331,22 @@ export function DraftPanel({
           const x = await extractWithCoverage(f);
           if (myGen !== gen.current) return;
           if (!x.text.trim()) {
-            notes.push(`${f.name} has no readable text (it may be scanned) — not attached. Add it to the matter's Files and use "Read scanned text" there.`);
+            notes.push(
+              `${f.name} has no readable text (it may be scanned) — not attached. Add it to the matter's Files and use "Read scanned text" there.`,
+            );
             continue;
           }
           if (x.text.length > LIMITS.attachmentChars) {
-            notes.push(`${f.name} has ${Math.round(x.text.length / 1000)}k characters of text; the per-reference limit is ${LIMITS.attachmentChars / 1000}k — not attached. Attach the relevant part instead.`);
+            notes.push(
+              `${f.name} has ${Math.round(x.text.length / 1000)}k characters of text; the per-reference limit is ${LIMITS.attachmentChars / 1000}k — not attached. Attach the relevant part instead.`,
+            );
             continue;
           }
           const used = attachedRef.current.reduce((n, a) => n + a.text.length, 0);
           if (used + x.text.length > LIMITS.attachmentsTotalChars) {
-            notes.push(`${f.name} would take the references past ${LIMITS.attachmentsTotalChars / 1000}k characters in total — not attached. Remove one first.`);
+            notes.push(
+              `${f.name} would take the references past ${LIMITS.attachmentsTotalChars / 1000}k characters in total — not attached. Remove one first.`,
+            );
             continue;
           }
           const item: Attached = {
@@ -396,7 +406,9 @@ export function DraftPanel({
               ok: true,
               note:
                 r.detail ??
-                (r.how === "replace" ? "Replaced as a tracked change." : "Inserted as a tracked change."),
+                (r.how === "replace"
+                  ? "Replaced as a tracked change."
+                  : "Inserted as a tracked change."),
             }
           : { ok: false, note: r.reason };
       }),
@@ -443,7 +455,11 @@ export function DraftPanel({
           <span className="truncate pl-1 font-display text-sm font-semibold">Assistant</span>
           <span className="flex-1" />
           <EffortToggle value={effort} onChange={setEffort} />
-          <IconBtn label="Clear conversation" onClick={doClear} disabled={!turns.length && !attached.length}>
+          <IconBtn
+            label="Clear conversation"
+            onClick={doClear}
+            disabled={!turns.length && !attached.length}
+          >
             <Trash2 className="h-3.5 w-3.5" />
           </IconBtn>
           {onClose && (
@@ -502,7 +518,10 @@ export function DraftPanel({
             </ul>
           )}
           {attached.length > 0 && (
-            <p>References are transient: sent with each AI request from this panel, not saved to the matter's files.</p>
+            <p>
+              References are transient: sent with each AI request from this panel, not saved to the
+              matter's files.
+            </p>
           )}
         </div>
 
@@ -593,7 +612,12 @@ export function DraftPanel({
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => {
                 // IME-safe: don't submit while composing (e.g. Japanese/Chinese input).
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                if (
+                  e.key === "Enter" &&
+                  !e.shiftKey &&
+                  !e.nativeEvent.isComposing &&
+                  e.keyCode !== 229
+                ) {
                   e.preventDefault();
                   if (idle && !extracting) submit();
                 }
@@ -629,7 +653,11 @@ export function DraftPanel({
                   aria-label={preparing ? "Preparing" : "Send"}
                   disabled={!q.trim() || preparing || !!extracting}
                 >
-                  {preparing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowUp className="h-3.5 w-3.5" />}
+                  {preparing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  )}
                 </Button>
               )}
             </div>
@@ -699,7 +727,9 @@ const TurnView = memo(function TurnView(p: {
             onClick={() => setShowAct((v) => !v)}
             aria-expanded={showAct}
           >
-            <ChevronRight className={`h-3 w-3 transition-transform ${showAct ? "rotate-90" : ""}`} />
+            <ChevronRight
+              className={`h-3 w-3 transition-transform ${showAct ? "rotate-90" : ""}`}
+            />
             {running
               ? running.label + "…"
               : `${t.activity.length} step${t.activity.length === 1 ? "" : "s"}${t.steps ? ` · ${t.steps} model round${t.steps === 1 ? "" : "s"}` : ""}`}
@@ -727,7 +757,9 @@ const TurnView = memo(function TurnView(p: {
           {streaming ? (
             <p className="whitespace-pre-wrap">{text}</p>
           ) : (
-            <ReactMarkdown components={{ a: (a) => <a {...a} target="_blank" rel="noopener noreferrer" /> }}>
+            <ReactMarkdown
+              components={{ a: (a) => <a {...a} target="_blank" rel="noopener noreferrer" /> }}
+            >
               {text}
             </ReactMarkdown>
           )}
@@ -780,13 +812,20 @@ const TurnView = memo(function TurnView(p: {
         </p>
       )}
       {t.apply && (
-        <p className={`text-xs ${t.apply.state === "applied" ? "text-foreground" : "text-ink-red"}`} role="status">
+        <p
+          className={`text-xs ${t.apply.state === "applied" ? "text-foreground" : "text-ink-red"}`}
+          role="status"
+        >
           {t.apply.state === "applied" ? (
             <Check className="mr-1 inline h-3 w-3" />
           ) : (
             <CircleAlert className="mr-1 inline h-3 w-3" />
           )}
-          {t.apply.state === "partial" ? "Partly applied — " : t.apply.state === "failed" ? "Not applied — " : ""}
+          {t.apply.state === "partial"
+            ? "Partly applied — "
+            : t.apply.state === "failed"
+              ? "Not applied — "
+              : ""}
           {t.apply.note}
         </p>
       )}
@@ -807,7 +846,13 @@ const TurnView = memo(function TurnView(p: {
           {t.status === "done" && <UsageNote effort={t.effort} usage={t.usage} />}
           <span className="flex-1" />
           {t.status !== "done" && t.retryable !== false && p.canRetry && (
-            <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => p.onRetry(t)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs"
+              onClick={() => p.onRetry(t)}
+            >
               <RotateCcw className="mr-1 h-3 w-3" /> Retry
             </Button>
           )}
@@ -817,7 +862,9 @@ const TurnView = memo(function TurnView(p: {
               size="sm"
               variant="ghost"
               className="h-6 px-2 text-xs"
-              onClick={() => copyText((fence ?? t.a).trim(), fence ? "Proposed text copied" : "Copied")}
+              onClick={() =>
+                copyText((fence ?? t.a).trim(), fence ? "Proposed text copied" : "Copied")
+              }
             >
               <Copy className="mr-1 h-3 w-3" /> Copy
             </Button>
@@ -828,7 +875,9 @@ const TurnView = memo(function TurnView(p: {
               size="sm"
               className="h-6 px-2 text-xs"
               disabled={p.anyApplying || decided}
-              onClick={() => p.onPlace(t, fence, kind === "xlsx" ? "cursor" : t.anchor ? "replace" : "cursor")}
+              onClick={() =>
+                p.onPlace(t, fence, kind === "xlsx" ? "cursor" : t.anchor ? "replace" : "cursor")
+              }
             >
               {kind === "xlsx" ? null : t.anchor ? (
                 <Replace className="mr-1 h-3 w-3" />
@@ -855,7 +904,11 @@ const TurnView = memo(function TurnView(p: {
 });
 
 function editLabel(e: WordEdit) {
-  return e.op === "format" ? `Format “${e.find}”` : e.op === "replace" ? "Replace" : `After “${e.anchor}”`;
+  return e.op === "format"
+    ? `Format “${e.find}”`
+    : e.op === "replace"
+      ? "Replace"
+      : `After “${e.anchor}”`;
 }
 
 /** Editable, re-validated review card for a structured proposal. */
@@ -875,17 +928,18 @@ function ProposalCard(p: {
   // Edited sheet values are re-checked here; Word edits are re-checked against the live document at Apply.
   const localErrors =
     edited && draft.kind === "sheet"
-      ? validateSheetOps(
-          [...new Set(draft.ops.map((o) => o.sheet))],
-          draft.ops,
-        ).errors.filter((e) => !/unknown sheet/.test(e))
+      ? validateSheetOps([...new Set(draft.ops.map((o) => o.sheet))], draft.ops).errors.filter(
+          (e) => !/unknown sheet/.test(e),
+        )
       : [];
   const shown = edited ? localErrors : errors;
   const valid = shown.length === 0;
   const setWord = (i: number, e: WordEdit) =>
-    draft.kind === "word" && setDraft({ ...draft, edits: draft.edits.map((x, j) => (j === i ? e : x)) });
+    draft.kind === "word" &&
+    setDraft({ ...draft, edits: draft.edits.map((x, j) => (j === i ? e : x)) });
   const setOp = (i: number, o: SheetOp) =>
-    draft.kind === "sheet" && setDraft({ ...draft, ops: draft.ops.map((x, j) => (j === i ? o : x)) });
+    draft.kind === "sheet" &&
+    setDraft({ ...draft, ops: draft.ops.map((x, j) => (j === i ? o : x)) });
   const lockedEdit = decided || !p.canInsert || t.status !== "done";
   return (
     <div className={`rounded-sm border ${valid ? "" : "border-ink-red/40"}`}>
@@ -897,7 +951,13 @@ function ProposalCard(p: {
         </span>
         <span className="flex-1 truncate text-muted-foreground">{draft.summary}</span>
         <span className={valid ? "text-muted-foreground" : "text-ink-red"}>
-          {edited ? (valid ? "Edited" : "Edited — fix errors") : valid ? "Checked" : "Didn't pass checks"}
+          {edited
+            ? valid
+              ? "Edited"
+              : "Edited — fix errors"
+            : valid
+              ? "Checked"
+              : "Didn't pass checks"}
         </span>
       </div>
       <div className="max-h-80 overflow-auto text-xs">
@@ -908,7 +968,9 @@ function ProposalCard(p: {
                 <p className="truncate text-[11px] text-muted-foreground">{editLabel(e)}</p>
                 {e.op === "replace" && (
                   <>
-                    <p className="whitespace-pre-wrap text-muted-foreground line-through decoration-ink-red/60">{e.find}</p>
+                    <p className="whitespace-pre-wrap text-muted-foreground line-through decoration-ink-red/60">
+                      {e.find}
+                    </p>
                     <textarea
                       aria-label={`Replacement text for edit ${i + 1}`}
                       className="w-full resize-y rounded-sm border bg-background px-1 py-0.5"
@@ -994,7 +1056,13 @@ function ProposalCard(p: {
       {p.canInsert && t.status === "done" && (
         <div className="flex justify-end gap-1 border-t px-2 py-1">
           {edited && !decided && (
-            <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setDraft(p.pr)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-xs"
+              onClick={() => setDraft(p.pr)}
+            >
               Reset
             </Button>
           )}
@@ -1007,7 +1075,13 @@ function ProposalCard(p: {
               copyText(
                 draft.kind === "word"
                   ? draft.edits
-                      .map((e) => (e.op === "replace" ? e.replace : e.op === "insert_after" ? e.text : `${e.find} → ${formatSummary(e.format)}`))
+                      .map((e) =>
+                        e.op === "replace"
+                          ? e.replace
+                          : e.op === "insert_after"
+                            ? e.text
+                            : `${e.find} → ${formatSummary(e.format)}`,
+                      )
                       .join("\n\n")
                   : draft.ops.map((o) => `${o.sheet}!${o.cell} = ${o.value}`).join("\n"),
                 "Copied",

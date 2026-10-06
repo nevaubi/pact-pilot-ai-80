@@ -21,8 +21,16 @@ export class XlsxUnsupported extends Error {
   }
 }
 
-type Cell = { v?: string | number | boolean | null; f?: string | null; s?: unknown; t?: number | null };
-type Style = { bl?: number; bg?: { rgb?: string }; ht?: number; n?: { pattern?: string } } & Record<string, unknown>;
+type Cell = {
+  v?: string | number | boolean | null;
+  f?: string | null;
+  s?: unknown;
+  t?: number | null;
+};
+type Style = { bl?: number; bg?: { rgb?: string }; ht?: number; n?: { pattern?: string } } & Record<
+  string,
+  unknown
+>;
 const SUPPORTED_STYLE_KEYS = new Set(["bl", "bg", "ht", "n"]);
 
 export type CellChange = {
@@ -31,8 +39,19 @@ export type CellChange = {
   row: number;
   col: number;
   /** null = value untouched (formatting-only change). */
-  value: { kind: "text"; text: string } | { kind: "number"; n: number } | { kind: "bool"; b: boolean } | { kind: "formula"; f: string } | { kind: "empty" } | null;
-  style: { bold?: boolean; fill?: string | null; align?: "left" | "center" | "right" | null; numFmt?: string | null } | null;
+  value:
+    | { kind: "text"; text: string }
+    | { kind: "number"; n: number }
+    | { kind: "bool"; b: boolean }
+    | { kind: "formula"; f: string }
+    | { kind: "empty" }
+    | null;
+  style: {
+    bold?: boolean;
+    fill?: string | null;
+    align?: "left" | "center" | "right" | null;
+    numFmt?: string | null;
+  } | null;
 };
 
 function colName(n: number) {
@@ -61,7 +80,14 @@ function pickStyle(st: Style) {
   return {
     bold: st.bl === 1,
     fill: st.bg?.rgb ? st.bg.rgb.toLowerCase() : null,
-    align: st.ht === 1 ? ("left" as const) : st.ht === 2 ? ("center" as const) : st.ht === 3 ? ("right" as const) : null,
+    align:
+      st.ht === 1
+        ? ("left" as const)
+        : st.ht === 2
+          ? ("center" as const)
+          : st.ht === 3
+            ? ("right" as const)
+            : null,
     numFmt: st.n?.pattern ?? null,
   };
 }
@@ -76,22 +102,37 @@ function sameJson(a: unknown, b: unknown) {
 export function diffWorkbooks(base: WorkbookData, cur: WorkbookData): CellChange[] {
   const names = (d: WorkbookData) => d.sheetOrder.map((id) => d.sheets[id]?.name);
   if (!sameJson(names(base), names(cur)))
-    throw new XlsxUnsupported("Sheets were added, removed, renamed or reordered. Saving that into the original file isn't supported yet.");
+    throw new XlsxUnsupported(
+      "Sheets were added, removed, renamed or reordered. Saving that into the original file isn't supported yet.",
+    );
   const changes: CellChange[] = [];
   base.sheetOrder.forEach((bid, i) => {
     const b = base.sheets[bid]!;
     const c = cur.sheets[cur.sheetOrder[i]!]!;
-    const norm = (m: { startRow: number; endRow: number; startColumn: number; endColumn: number }[] | undefined) =>
-      (m ?? []).map((x) => `${x.startRow},${x.startColumn},${x.endRow},${x.endColumn}`).sort();
+    const norm = (
+      m: { startRow: number; endRow: number; startColumn: number; endColumn: number }[] | undefined,
+    ) => (m ?? []).map((x) => `${x.startRow},${x.startColumn},${x.endRow},${x.endColumn}`).sort();
     if (!sameJson(norm(b.mergeData), norm(c.mergeData)))
-      throw new XlsxUnsupported(`Merged cells changed on "${b.name}". Saving merges into the original file isn't supported yet.`);
+      throw new XlsxUnsupported(
+        `Merged cells changed on "${b.name}". Saving merges into the original file isn't supported yet.`,
+      );
     const sizes = (x: Record<number, { w?: number; h?: number }> | undefined) =>
-      Object.entries(x ?? {}).filter(([, v]) => v && (v.w || v.h)).map(([k, v]) => `${k}:${v.w ?? ""}:${v.h ?? ""}`).sort();
-    if (!sameJson(sizes(b.columnData), sizes(c.columnData)) || !sameJson(sizes(b.rowData), sizes(c.rowData)))
-      throw new XlsxUnsupported(`Row heights or column widths changed on "${b.name}". That isn't saved into the original file yet — undo it to save.`);
+      Object.entries(x ?? {})
+        .filter(([, v]) => v && (v.w || v.h))
+        .map(([k, v]) => `${k}:${v.w ?? ""}:${v.h ?? ""}`)
+        .sort();
+    if (
+      !sameJson(sizes(b.columnData), sizes(c.columnData)) ||
+      !sameJson(sizes(b.rowData), sizes(c.rowData))
+    )
+      throw new XlsxUnsupported(
+        `Row heights or column widths changed on "${b.name}". That isn't saved into the original file yet — undo it to save.`,
+      );
     const keys = new Set<string>();
-    for (const [r, row] of Object.entries(b.cellData ?? {})) for (const col of Object.keys(row ?? {})) keys.add(`${r}:${col}`);
-    for (const [r, row] of Object.entries(c.cellData ?? {})) for (const col of Object.keys(row ?? {})) keys.add(`${r}:${col}`);
+    for (const [r, row] of Object.entries(b.cellData ?? {}))
+      for (const col of Object.keys(row ?? {})) keys.add(`${r}:${col}`);
+    for (const [r, row] of Object.entries(c.cellData ?? {}))
+      for (const col of Object.keys(row ?? {})) keys.add(`${r}:${col}`);
     for (const k of keys) {
       const [r, col] = k.split(":").map(Number) as [number, number];
       const bc = (b.cellData?.[r]?.[col] ?? {}) as Cell;
@@ -103,10 +144,14 @@ export function diffWorkbooks(base: WorkbookData, cur: WorkbookData): CellChange
       const bf = bc.f || null;
       const cf = cc.f || null;
       const styleChanged = !sameJson(pickStyle(bs), pickStyle(cs));
-      const otherStyleKeys = new Set([...Object.keys(bs), ...Object.keys(cs)].filter((x) => !SUPPORTED_STYLE_KEYS.has(x)));
+      const otherStyleKeys = new Set(
+        [...Object.keys(bs), ...Object.keys(cs)].filter((x) => !SUPPORTED_STYLE_KEYS.has(x)),
+      );
       for (const key of otherStyleKeys)
         if (!sameJson(bs[key], cs[key]))
-          throw new XlsxUnsupported(`Formatting on "${b.name}"!${colName(col + 1)}${r + 1} changed in a way that isn't saved into the original file yet (only bold, fill, alignment and number format are).`);
+          throw new XlsxUnsupported(
+            `Formatting on "${b.name}"!${colName(col + 1)}${r + 1} changed in a way that isn't saved into the original file yet (only bold, fill, alignment and number format are).`,
+          );
       const formulaChanged = bf !== cf;
       // A formula whose cached result moved isn't an edit; only a changed formula or literal value is.
       const valueChanged = formulaChanged || (!cf && bv !== cv);
@@ -144,7 +189,8 @@ function q(el: Element, local: string): Element[] {
   return Array.from(el.getElementsByTagNameNS(NS, local));
 }
 function child(el: Element, local: string): Element | null {
-  for (const c of Array.from(el.childNodes)) if (c.nodeType === 1 && (c as Element).localName === local) return c as Element;
+  for (const c of Array.from(el.childNodes))
+    if (c.nodeType === 1 && (c as Element).localName === local) return c as Element;
   return null;
 }
 function resolveTarget(base: string, target: string) {
@@ -161,18 +207,24 @@ function resolveTarget(base: string, target: string) {
 export async function openPackage(buf: ArrayBuffer) {
   const head = new Uint8Array(buf.slice(0, 8));
   if (head[0] === 0xd0 && head[1] === 0xcf && head[2] === 0x11 && head[3] === 0xe0)
-    throw new XlsxUnsupported("This workbook is encrypted or a legacy binary file; it can't be saved from the editor.");
+    throw new XlsxUnsupported(
+      "This workbook is encrypted or a legacy binary file; it can't be saved from the editor.",
+    );
   if (head[0] !== 0x50 || head[1] !== 0x4b) throw new XlsxUnsupported("Not a valid .xlsx package.");
   const zip = await JSZip.loadAsync(buf);
   const files = Object.values(zip.files);
-  if (files.length > PACKAGE_LIMITS.entries) throw new XlsxUnsupported("The workbook package has too many parts to patch safely.");
+  if (files.length > PACKAGE_LIMITS.entries)
+    throw new XlsxUnsupported("The workbook package has too many parts to patch safely.");
   let total = 0;
   for (const f of files) {
-    const size = (f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0;
+    const size =
+      (f as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0;
     total += size;
   }
-  if (total > PACKAGE_LIMITS.uncompressedBytes) throw new XlsxUnsupported("The workbook is too large to patch safely in the browser.");
-  if (zip.file("xl/vbaProject.bin")) throw new XlsxUnsupported("Macro-enabled workbooks can't be saved from the editor.");
+  if (total > PACKAGE_LIMITS.uncompressedBytes)
+    throw new XlsxUnsupported("The workbook is too large to patch safely in the browser.");
+  if (zip.file("xl/vbaProject.bin"))
+    throw new XlsxUnsupported("Macro-enabled workbooks can't be saved from the editor.");
   const ct = await zip.file("[Content_Types].xml")?.async("string");
   if (!ct || /macroEnabled/i.test(ct)) throw new XlsxUnsupported("Unsupported workbook type.");
   return zip;
@@ -191,12 +243,16 @@ async function loadDoc(ctx: Pick<Ctx, "zip" | "parser">, path: string) {
   const xml = await ctx.zip.file(path)?.async("string");
   if (xml == null) throw new XlsxUnsupported(`Missing part ${path}.`);
   const doc = ctx.parser.parseFromString(xml, "application/xml");
-  if (doc.getElementsByTagName("parsererror").length) throw new XlsxUnsupported(`Couldn't read ${path}.`);
+  if (doc.getElementsByTagName("parsererror").length)
+    throw new XlsxUnsupported(`Couldn't read ${path}.`);
   return doc;
 }
 
 function appendStyle(ctx: Ctx, baseXf: number, want: NonNullable<CellChange["style"]>): number {
-  if (!ctx.styles) throw new XlsxUnsupported("The workbook has no style sheet; formatting can't be saved into it.");
+  if (!ctx.styles)
+    throw new XlsxUnsupported(
+      "The workbook has no style sheet; formatting can't be saved into it.",
+    );
   const d = ctx.styles.doc;
   const root = d.documentElement;
   const cellXfs = q(root, "cellXfs")[0];
@@ -206,7 +262,11 @@ function appendStyle(ctx: Ctx, baseXf: number, want: NonNullable<CellChange["sty
   if (!src) throw new XlsxUnsupported("The workbook's style sheet has no cell formats.");
   const xf = src.cloneNode(true) as Element;
   const el = (name: string) => d.createElementNS(NS, name);
-  const bump = (container: Element) => container.setAttribute("count", String(Array.from(container.childNodes).filter((n) => n.nodeType === 1).length));
+  const bump = (container: Element) =>
+    container.setAttribute(
+      "count",
+      String(Array.from(container.childNodes).filter((n) => n.nodeType === 1).length),
+    );
   if (want.bold !== undefined) {
     const fonts = q(root, "fonts")[0]!;
     const list = q(fonts, "font");
@@ -257,10 +317,16 @@ function appendStyle(ctx: Ctx, baseXf: number, want: NonNullable<CellChange["sty
         numFmts = el("numFmts");
         root.insertBefore(numFmts, root.firstElementChild);
       }
-      const existing = q(numFmts, "numFmt").find((x) => x.getAttribute("formatCode") === want.numFmt);
+      const existing = q(numFmts, "numFmt").find(
+        (x) => x.getAttribute("formatCode") === want.numFmt,
+      );
       let id = existing ? Number(existing.getAttribute("numFmtId")) : 0;
       if (!existing) {
-        id = Math.max(163, ...q(numFmts, "numFmt").map((x) => Number(x.getAttribute("numFmtId") ?? 0))) + 1;
+        id =
+          Math.max(
+            163,
+            ...q(numFmts, "numFmt").map((x) => Number(x.getAttribute("numFmtId") ?? 0)),
+          ) + 1;
         const nf = el("numFmt");
         nf.setAttribute("numFmtId", String(id));
         nf.setAttribute("formatCode", want.numFmt);
@@ -276,8 +342,16 @@ function appendStyle(ctx: Ctx, baseXf: number, want: NonNullable<CellChange["sty
   return xfs.length;
 }
 
-function findOrCreateCell(doc: Document, sheetData: Element, row: number, col: number, ref: string) {
-  const rows = Array.from(sheetData.childNodes).filter((n): n is Element => n.nodeType === 1 && (n as Element).localName === "row");
+function findOrCreateCell(
+  doc: Document,
+  sheetData: Element,
+  row: number,
+  col: number,
+  ref: string,
+) {
+  const rows = Array.from(sheetData.childNodes).filter(
+    (n): n is Element => n.nodeType === 1 && (n as Element).localName === "row",
+  );
   let rowEl = rows.find((r) => Number(r.getAttribute("r")) === row) ?? null;
   if (!rowEl) {
     rowEl = doc.createElementNS(NS, "row");
@@ -285,10 +359,15 @@ function findOrCreateCell(doc: Document, sheetData: Element, row: number, col: n
     const after = rows.find((r) => Number(r.getAttribute("r")) > row) ?? null;
     sheetData.insertBefore(rowEl, after);
   }
-  const cells = Array.from(rowEl.childNodes).filter((n): n is Element => n.nodeType === 1 && (n as Element).localName === "c");
+  const cells = Array.from(rowEl.childNodes).filter(
+    (n): n is Element => n.nodeType === 1 && (n as Element).localName === "c",
+  );
   let c = cells.find((x) => x.getAttribute("r") === ref) ?? null;
   if (!c) {
-    if (cells.some((x) => !x.getAttribute("r"))) throw new XlsxUnsupported(`Row ${row} uses implicit cell positions; it can't be patched safely.`);
+    if (cells.some((x) => !x.getAttribute("r")))
+      throw new XlsxUnsupported(
+        `Row ${row} uses implicit cell positions; it can't be patched safely.`,
+      );
     c = doc.createElementNS(NS, "c");
     c.setAttribute("r", ref);
     const after = cells.find((x) => (parseRef(x.getAttribute("r") ?? "")?.col ?? 0) > col) ?? null;
@@ -302,7 +381,8 @@ function inMerge(ws: Element, row: number, col: number) {
     const [a, b] = (m.getAttribute("ref") ?? "").split(":");
     const s = parseRef(a ?? "");
     const e = parseRef(b ?? a ?? "");
-    if (s && e && row >= s.row && row <= e.row && col >= s.col && col <= e.col) return { anchor: row === s.row && col === s.col };
+    if (s && e && row >= s.row && row <= e.row && col >= s.col && col <= e.col)
+      return { anchor: row === s.row && col === s.col };
   }
   return null;
 }
@@ -320,12 +400,16 @@ export async function patchXlsx(original: ArrayBuffer, changes: CellChange[]): P
   const relsDoc = await loadDoc({ zip, parser }, "xl/_rels/workbook.xml.rels");
   const rels = new Map<string, { target: string; type: string }>();
   for (const r of Array.from(relsDoc.getElementsByTagNameNS(NS_PKG_REL, "Relationship")))
-    rels.set(r.getAttribute("Id") ?? "", { target: r.getAttribute("Target") ?? "", type: r.getAttribute("Type") ?? "" });
+    rels.set(r.getAttribute("Id") ?? "", {
+      target: r.getAttribute("Target") ?? "",
+      type: r.getAttribute("Type") ?? "",
+    });
   const sheetPaths = new Map<string, string>();
   for (const s of q(wbDoc.documentElement, "sheet")) {
     const rid = s.getAttributeNS(NS_R, "id") ?? "";
     const rel = rels.get(rid);
-    if (rel) sheetPaths.set(s.getAttribute("name") ?? "", resolveTarget("xl/workbook.xml", rel.target));
+    if (rel)
+      sheetPaths.set(s.getAttribute("name") ?? "", resolveTarget("xl/workbook.xml", rel.target));
   }
   const stylesRel = [...rels.values()].find((r) => r.type.endsWith("/styles"));
   const stylesPath = stylesRel ? resolveTarget("xl/workbook.xml", stylesRel.target) : null;
@@ -334,7 +418,9 @@ export async function patchXlsx(original: ArrayBuffer, changes: CellChange[]): P
     parser,
     ser,
     sheetPaths,
-    styles: stylesPath ? { path: stylesPath, doc: await loadDoc({ zip, parser }, stylesPath) } : null,
+    styles: stylesPath
+      ? { path: stylesPath, doc: await loadDoc({ zip, parser }, stylesPath) }
+      : null,
     wb: { path: "xl/workbook.xml", doc: wbDoc },
   };
   const bySheet = new Map<string, CellChange[]>();
@@ -346,8 +432,10 @@ export async function patchXlsx(original: ArrayBuffer, changes: CellChange[]): P
     if (!path) throw new XlsxUnsupported(`Couldn't find the part for sheet "${sheet}".`);
     const doc = await loadDoc(ctx, path);
     const ws = doc.documentElement;
-    if (ws.localName !== "worksheet") throw new XlsxUnsupported(`"${sheet}" is not a regular worksheet.`);
-    if (q(ws, "sheetProtection").length) throw new XlsxUnsupported(`"${sheet}" is protected; it can't be edited from here.`);
+    if (ws.localName !== "worksheet")
+      throw new XlsxUnsupported(`"${sheet}" is not a regular worksheet.`);
+    if (q(ws, "sheetProtection").length)
+      throw new XlsxUnsupported(`"${sheet}" is protected; it can't be edited from here.`);
     const sheetData = q(ws, "sheetData")[0];
     if (!sheetData) throw new XlsxUnsupported(`"${sheet}" has no cell data section.`);
     // Shared/array formula regions anywhere near our targets are refused outright.
@@ -366,14 +454,20 @@ export async function patchXlsx(original: ArrayBuffer, changes: CellChange[]): P
           if (s && e)
             for (const c of list)
               if (c.row >= s.row && c.row <= e.row && c.col >= s.col && c.col <= e.col)
-                throw new XlsxUnsupported(`${sheet}!${c.ref} is inside a shared or array formula region (${ref}); editing it isn't supported yet.`);
+                throw new XlsxUnsupported(
+                  `${sheet}!${c.ref} is inside a shared or array formula region (${ref}); editing it isn't supported yet.`,
+                );
         }
       }
     }
     for (const ch of list) {
-      if (shared.has(ch.ref)) throw new XlsxUnsupported(`${sheet}!${ch.ref} is part of a shared or array formula; editing it isn't supported yet.`);
+      if (shared.has(ch.ref))
+        throw new XlsxUnsupported(
+          `${sheet}!${ch.ref} is part of a shared or array formula; editing it isn't supported yet.`,
+        );
       const m = inMerge(ws, ch.row, ch.col);
-      if (m && !m.anchor) throw new XlsxUnsupported(`${sheet}!${ch.ref} is hidden inside a merged range.`);
+      if (m && !m.anchor)
+        throw new XlsxUnsupported(`${sheet}!${ch.ref} is hidden inside a merged range.`);
       const c = findOrCreateCell(doc, sheetData, ch.row, ch.col, ch.ref);
       if (ch.value) {
         for (const tag of ["f", "v", "is"]) {
@@ -431,7 +525,9 @@ export async function patchXlsx(original: ArrayBuffer, changes: CellChange[]): P
     // A stale calcChain would point Excel at removed formulas; drop only when formulas changed.
   }
   const out = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
-  return new Blob([out as BlobPart], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  return new Blob([out as BlobPart], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
 }
 
 /** True when the workbook's base date is 1904 (Mac legacy). */

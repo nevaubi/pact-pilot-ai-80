@@ -24,8 +24,10 @@ export function checkPublicUrl(raw: string, base?: string): UrlCheck {
     return { ok: false, reason: "Not a valid URL." };
   }
   if (u.protocol !== "https:") return { ok: false, reason: "Only https URLs are allowed." };
-  if (u.username || u.password) return { ok: false, reason: "URLs with credentials are not allowed." };
-  if (u.port && u.port !== "443") return { ok: false, reason: "Only the default https port is allowed." };
+  if (u.username || u.password)
+    return { ok: false, reason: "URLs with credentials are not allowed." };
+  if (u.port && u.port !== "443")
+    return { ok: false, reason: "Only the default https port is allowed." };
   const host = u.hostname.toLowerCase();
   const prefixes = PUBLIC_HOSTS[host];
   if (!prefixes)
@@ -39,13 +41,30 @@ export function checkPublicUrl(raw: string, base?: string): UrlCheck {
 }
 
 export type SafeFetchResult =
-  | { ok: true; status: number; finalUrl: string; contentType: string; body: string; truncated: boolean }
-  | { ok: false; status: number | null; reason: string; kind: "blocked" | "timeout" | "http" | "network" };
+  | {
+      ok: true;
+      status: number;
+      finalUrl: string;
+      contentType: string;
+      body: string;
+      truncated: boolean;
+    }
+  | {
+      ok: false;
+      status: number | null;
+      reason: string;
+      kind: "blocked" | "timeout" | "http" | "network";
+    };
 
 /** Fetch an allowlisted URL with manual, re-validated redirects and a single deadline incl. body. */
 export async function safePublicFetch(
   raw: string,
-  o: { signal?: AbortSignal; ms?: number; maxBytes?: number; headers?: Record<string, string> } = {},
+  o: {
+    signal?: AbortSignal;
+    ms?: number;
+    maxBytes?: number;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<SafeFetchResult> {
   const ms = o.ms ?? 12_000;
   const maxBytes = o.maxBytes ?? 1_500_000;
@@ -71,7 +90,13 @@ export async function safePublicFetch(
       if (res.status >= 300 && res.status < 400) {
         const loc = res.headers.get("location");
         await res.body?.cancel().catch(() => {});
-        if (!loc) return { ok: false, status: res.status, reason: "Redirect without a location.", kind: "http" };
+        if (!loc)
+          return {
+            ok: false,
+            status: res.status,
+            reason: "Redirect without a location.",
+            kind: "http",
+          };
         check = checkPublicUrl(loc, check.url.toString());
         continue;
       }
@@ -118,7 +143,13 @@ export async function safePublicFetch(
     return {
       ok: false,
       status: null,
-      reason: timedOut ? `No answer within ${ms / 1000}s.` : o.signal?.aborted ? "Stopped." : e instanceof Error ? e.message : "Network error.",
+      reason: timedOut
+        ? `No answer within ${ms / 1000}s.`
+        : o.signal?.aborted
+          ? "Stopped."
+          : e instanceof Error
+            ? e.message
+            : "Network error.",
       kind: timedOut ? "timeout" : "network",
     };
   } finally {
@@ -127,19 +158,43 @@ export async function safePublicFetch(
   }
 }
 
-export type ProviderStatus = "ok" | "no_results" | "rate_limited" | "unavailable" | "not_configured";
-export type PublicHit = { provider: string; citation: string; title: string; url: string; snippet: string; date: string | null };
-export type ProviderResult = { provider: string; status: ProviderStatus; detail?: string; results: PublicHit[] };
+export type ProviderStatus =
+  "ok" | "no_results" | "rate_limited" | "unavailable" | "not_configured";
+export type PublicHit = {
+  provider: string;
+  citation: string;
+  title: string;
+  url: string;
+  snippet: string;
+  date: string | null;
+};
+export type ProviderResult = {
+  provider: string;
+  status: ProviderStatus;
+  detail?: string;
+  results: PublicHit[];
+};
 
 const strip = (s: string | null | undefined) => decodeEntities((s ?? "").replace(/<[^>]+>/g, ""));
 
-function failed(provider: string, r: Extract<SafeFetchResult, { ok: false }>, tokenless = false): ProviderResult {
-  if (r.status === 429) return { provider, status: "rate_limited", detail: "Rate limited — try again later.", results: [] };
+function failed(
+  provider: string,
+  r: Extract<SafeFetchResult, { ok: false }>,
+  tokenless = false,
+): ProviderResult {
+  if (r.status === 429)
+    return {
+      provider,
+      status: "rate_limited",
+      detail: "Rate limited — try again later.",
+      results: [],
+    };
   if (tokenless && (r.status === 401 || r.status === 403))
     return {
       provider,
       status: "not_configured",
-      detail: "CourtListener refused an anonymous request; a COURTLISTENER_API_TOKEN secret would be needed.",
+      detail:
+        "CourtListener refused an anonymous request; a COURTLISTENER_API_TOKEN secret would be needed.",
       results: [],
     };
   return { provider, status: "unavailable", detail: r.reason, results: [] };
@@ -160,8 +215,16 @@ export async function ecfrSearch(q: string, signal?: AbortSignal): Promise<Provi
     { ...(signal ? { signal } : {}) },
   );
   if (!r.ok) return failed(p, r);
-  const j = parseJson<{ results?: { starts_on?: string; hierarchy?: { title?: string; part?: string; section?: string | null }; headings?: { section?: string | null; part?: string | null }; full_text_excerpt?: string | null }[] }>(r.body);
-  if (!j) return { provider: p, status: "unavailable", detail: "Unexpected response.", results: [] };
+  const j = parseJson<{
+    results?: {
+      starts_on?: string;
+      hierarchy?: { title?: string; part?: string; section?: string | null };
+      headings?: { section?: string | null; part?: string | null };
+      full_text_excerpt?: string | null;
+    }[];
+  }>(r.body);
+  if (!j)
+    return { provider: p, status: "unavailable", detail: "Unexpected response.", results: [] };
   const results = (j.results ?? [])
     .filter((x) => x.hierarchy?.title && x.hierarchy?.part)
     .map((x) => {
@@ -173,7 +236,9 @@ export async function ecfrSearch(q: string, signal?: AbortSignal): Promise<Provi
         provider: p,
         citation: cite,
         title: strip(sec ? x.headings?.section : x.headings?.part) || cite,
-        url: sec ? `https://www.ecfr.gov/current/title-${t}/section-${sec}` : `https://www.ecfr.gov/current/title-${t}/part-${part}`,
+        url: sec
+          ? `https://www.ecfr.gov/current/title-${t}/section-${sec}`
+          : `https://www.ecfr.gov/current/title-${t}/part-${part}`,
         snippet: strip(x.full_text_excerpt).slice(0, 300),
         date: x.starts_on ?? null,
       };
@@ -181,15 +246,31 @@ export async function ecfrSearch(q: string, signal?: AbortSignal): Promise<Provi
   return { provider: p, status: results.length ? "ok" : "no_results", results };
 }
 
-export async function federalRegisterSearch(q: string, signal?: AbortSignal): Promise<ProviderResult> {
+export async function federalRegisterSearch(
+  q: string,
+  signal?: AbortSignal,
+): Promise<ProviderResult> {
   const p = "Federal Register";
   const qs = new URLSearchParams({ per_page: "8", order: "relevance" });
   qs.set("conditions[term]", q);
-  for (const f of ["title", "type", "publication_date", "html_url", "document_number", "abstract"]) qs.append("fields[]", f);
-  const r = await safePublicFetch(`https://www.federalregister.gov/api/v1/documents.json?${qs}`, { ...(signal ? { signal } : {}) });
+  for (const f of ["title", "type", "publication_date", "html_url", "document_number", "abstract"])
+    qs.append("fields[]", f);
+  const r = await safePublicFetch(`https://www.federalregister.gov/api/v1/documents.json?${qs}`, {
+    ...(signal ? { signal } : {}),
+  });
   if (!r.ok) return failed(p, r);
-  const j = parseJson<{ results?: { title: string; type?: string; publication_date?: string; html_url?: string; document_number: string; abstract?: string | null }[] }>(r.body);
-  if (!j) return { provider: p, status: "unavailable", detail: "Unexpected response.", results: [] };
+  const j = parseJson<{
+    results?: {
+      title: string;
+      type?: string;
+      publication_date?: string;
+      html_url?: string;
+      document_number: string;
+      abstract?: string | null;
+    }[];
+  }>(r.body);
+  if (!j)
+    return { provider: p, status: "unavailable", detail: "Unexpected response.", results: [] };
   const results = (j.results ?? []).map((d) => ({
     provider: p,
     citation: `${d.publication_date?.slice(0, 4) ?? ""} FR Doc. ${d.document_number}`.trim(),
@@ -201,17 +282,35 @@ export async function federalRegisterSearch(q: string, signal?: AbortSignal): Pr
   return { provider: p, status: results.length ? "ok" : "no_results", results };
 }
 
-export async function courtListenerSearch(q: string, signal?: AbortSignal): Promise<ProviderResult> {
+export async function courtListenerSearch(
+  q: string,
+  signal?: AbortSignal,
+): Promise<ProviderResult> {
   const p = "CourtListener";
   const token = process.env["COURTLISTENER_API_TOKEN"];
-  const qs = new URLSearchParams({ q, type: "o", order_by: "score desc", court: "ill illappct ca7 ilnd ilcd ilsd scotus" });
+  const qs = new URLSearchParams({
+    q,
+    type: "o",
+    order_by: "score desc",
+    court: "ill illappct ca7 ilnd ilcd ilsd scotus",
+  });
   const r = await safePublicFetch(`https://www.courtlistener.com/api/rest/v4/search/?${qs}`, {
     ...(signal ? { signal } : {}),
     ...(token ? { headers: { Authorization: `Token ${token}` } } : {}),
   });
   if (!r.ok) return failed(p, r, !token);
-  const j = parseJson<{ results?: { caseName: string; citation?: string[]; court: string; dateFiled?: string; absolute_url: string; opinions?: { snippet?: string }[] }[] }>(r.body);
-  if (!j) return { provider: p, status: "unavailable", detail: "Unexpected response.", results: [] };
+  const j = parseJson<{
+    results?: {
+      caseName: string;
+      citation?: string[];
+      court: string;
+      dateFiled?: string;
+      absolute_url: string;
+      opinions?: { snippet?: string }[];
+    }[];
+  }>(r.body);
+  if (!j)
+    return { provider: p, status: "unavailable", detail: "Unexpected response.", results: [] };
   const results = (j.results ?? []).slice(0, 8).map((o) => ({
     provider: p,
     citation: o.citation?.[0] ?? o.caseName,
@@ -230,7 +329,11 @@ export async function courtListenerSearch(q: string, signal?: AbortSignal): Prom
 
 /** Each provider's outcome is reported separately; a failure is never presented as zero hits. */
 export async function searchPublicLaw(q: string, signal?: AbortSignal): Promise<ProviderResult[]> {
-  return Promise.all([ecfrSearch(q, signal), federalRegisterSearch(q, signal), courtListenerSearch(q, signal)]);
+  return Promise.all([
+    ecfrSearch(q, signal),
+    federalRegisterSearch(q, signal),
+    courtListenerSearch(q, signal),
+  ]);
 }
 
 /** Read one allowlisted public-law page as plain text (HTML/XML/JSON only; PDFs are not parsed here). */

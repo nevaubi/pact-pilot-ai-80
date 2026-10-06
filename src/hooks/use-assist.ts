@@ -344,9 +344,7 @@ export function useAssist(o: {
             } else if (ev.t === "notice") patch({ notice: ev.text });
             else if (ev.t === "done") {
               flushReq(me);
-              const answered =
-                sawProposal ||
-                !!turnsRef.current.find((t) => t.id === id)?.a.trim();
+              const answered = sawProposal || !!turnsRef.current.find((t) => t.id === id)?.a.trim();
               if (!answered)
                 finish({
                   status: "error",

@@ -37,7 +37,10 @@ export type ApplyResult =
 /** Only an explicit `success: true` counts. Missing, null or shapeless receipts are failures. */
 export function strictReceipt(r: unknown): { ok: true } | { ok: false; message: string } {
   if (!r || typeof r !== "object")
-    return { ok: false, message: "The editor returned no receipt, so the change can't be confirmed." };
+    return {
+      ok: false,
+      message: "The editor returned no receipt, so the change can't be confirmed.",
+    };
   const x = r as { success?: unknown; failure?: { message?: unknown; code?: unknown } };
   if (x.success === true) return { ok: true };
   if (x.success === false) {
@@ -113,7 +116,12 @@ export function wordSteps(edits: WordEdit[]): WordStep[] {
   return edits.map((e, i): WordStep => {
     const id = `e${i + 1}`;
     if (e.op === "replace")
-      return { id, op: "text.rewrite", where: where(e.find), args: { replacement: { text: e.replace } } };
+      return {
+        id,
+        op: "text.rewrite",
+        where: where(e.find),
+        args: { replacement: { text: e.replace } },
+      };
     if (e.op === "insert_after")
       return {
         id,
@@ -121,7 +129,12 @@ export function wordSteps(edits: WordEdit[]): WordStep[] {
         where: where(e.anchor),
         args: { position: "after", content: { text: e.text } },
       };
-    return { id, op: "format.apply", where: where(e.find), args: { inline: inlinePatch(e.format) } };
+    return {
+      id,
+      op: "format.apply",
+      where: where(e.find),
+      args: { inline: inlinePatch(e.format) },
+    };
   });
 }
 
@@ -173,7 +186,9 @@ export async function applyWordEdits(eng: WordEngine, edits: WordEdit[]): Promis
       ok: false,
       applied: 0,
       ...(moved ? { partial: true } : {}),
-      reason: moved ? `${r.message} The document did change — review the tracked changes.` : r.message,
+      reason: moved
+        ? `${r.message} The document did change — review the tracked changes.`
+        : r.message,
     };
   }
   const outcomes = Array.isArray(receipt.steps) ? receipt.steps : [];
@@ -241,7 +256,8 @@ export function verifyWrite(o: SheetOp, now: CellState): string | null {
   const ref = `${o.sheet}!${o.cell}`;
   switch (o.type) {
     case "formula":
-      if (!now.f || !sameFormula(now.f, o.value)) return `${ref} did not take the proposed formula.`;
+      if (!now.f || !sameFormula(now.f, o.value))
+        return `${ref} did not take the proposed formula.`;
       break;
     case "clear":
       if (now.f) return `${ref} still has a formula after clearing.`;
@@ -251,12 +267,14 @@ export function verifyWrite(o: SheetOp, now: CellState): string | null {
       break;
     case "text":
       if (now.f) return `${ref} became a formula; text must stay literal.`;
-      if (typeof now.v !== "string" || now.v !== o.value) return `${ref} did not keep the exact text.`;
+      if (typeof now.v !== "string" || now.v !== o.value)
+        return `${ref} did not keep the exact text.`;
       break;
     default: {
       const want = sheetOpValue(o);
       if (now.f) return `${ref} became a formula.`;
-      if (typeof now.v !== typeof want || now.v !== want) return `${ref} did not take the proposed ${o.type}.`;
+      if (typeof now.v !== typeof want || now.v !== want)
+        return `${ref} did not take the proposed ${o.type}.`;
     }
   }
   if (o.numberFormat != null && now.style.numberFormat !== o.numberFormat)

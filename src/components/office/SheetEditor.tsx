@@ -75,7 +75,8 @@ export function assignmentsToOps(
             : "text";
     ops.push({ sheet: a.sheet ?? askSheet, cell: a.cell, type, value: type === "clear" ? "" : v });
   }
-  if (!lines.length) errors.push("No cell assignments to apply (expected lines like B12 = =SUM(B2:B11)).");
+  if (!lines.length)
+    errors.push("No cell assignments to apply (expected lines like B12 = =SUM(B2:B11)).");
   return { ops: errors.length ? [] : ops, errors };
 }
 
@@ -299,7 +300,8 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
           };
         // Free text is never written into a cell; the whole fence must be cell assignments.
         const { ops, errors } = assignmentsToOps(text, askSheet);
-        if (errors.length) return { ok: false, reason: `Nothing was changed: ${errors.slice(0, 3).join(" ")}` };
+        if (errors.length)
+          return { ok: false, reason: `Nothing was changed: ${errors.slice(0, 3).join(" ")}` };
         const r = applySheetOps(sheetEngine(wb), ops);
         if (!r.ok) {
           if (r.partial) onDirty();
