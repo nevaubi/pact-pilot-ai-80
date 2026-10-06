@@ -166,7 +166,7 @@ export function FilesTab({ matterId }: { matterId: string }) {
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
         <p className="text-sm font-medium">
-          {busy ? `Uploading ${busy}…` : "Drop deal documents here, or click to choose"}
+          {busy ?? "Drop deal documents here, or click to choose"}
         </p>
         <p className="text-xs text-muted-foreground">
           PDF, Word (.docx) or text, up to {MAX_FILE_MB} MB. LOIs, agreements, questionnaires.
