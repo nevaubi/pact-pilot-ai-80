@@ -233,7 +233,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           return { ok: true, tracked: true, how: "cursor" };
         } catch (e) {
           console.error("[office:docx:insert]", e);
-          return { ok: false, reason: e instanceof Error ? e.message : "The editor couldn't apply that change." };
+          return { ok: false, reason: plain(e) };
         }
       },
       export: async () => {
