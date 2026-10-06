@@ -38,8 +38,8 @@ export type EditorHandle = {
   ) => Promise<InsertResult>;
   /** Serialize the current document for saving (reserialized — callers use the original bytes when unchanged). */
   export: () => Promise<Blob>;
-  /** Monotonic edit counter: bumps on every real edit, so saves can tell whether the user typed meanwhile. */
-  revision?: () => number;
+  /** Called after a successful save with the bytes now stored, so later exports diff against them. */
+  markSaved?: (saved: Blob) => void;
   /** Apply a validated structured proposal (Word edits or sheet ops) after the attorney clicks Apply. */
   applyProposal?: (p: Proposal) => Promise<ApplyResult>;
   /** Spreadsheet snapshot (values + formulas) for the assistant's cell tools. */
