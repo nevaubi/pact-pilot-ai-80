@@ -14,14 +14,27 @@ const bodyZ = z.object({
     .max(8)
     .optional(),
   runId: z.string().max(200).optional(),
+  /** "draft" = Office drafting panel: the open document is the primary context. */
+  mode: z.enum(["assist", "draft"]).optional(),
+  document: z
+    .object({
+      name: z.string().max(300),
+      kind: z.enum(["docx", "pdf", "xlsx", "text"]),
+      text: z.string().max(200_000),
+      selection: z.string().max(20_000).optional(),
+    })
+    .optional(),
 });
+
+/** Character budget for the open document per effort (the matter's other files still come through matterContext). */
+const DOC_BUDGET = { normal: 24_000, advanced: 90_000 } as const;
 
 export const Route = createFileRoute("/api/assist")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const { authFromRequest } = await import("@/lib/auth.server");
-        const { aiStream, matterContext, askInstructions, logRun, toAiError, matterSources, queriesFromText } =
+        const { aiStream, matterContext, askInstructions, draftInstructions, logRun, toAiError, matterSources, queriesFromText } =
           await import("@/lib/ai.server");
 
         const auth = await authFromRequest(request).catch(() => null);
@@ -29,11 +42,13 @@ export const Route = createFileRoute("/api/assist")({
 
         const parsed = bodyZ.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return Response.json({ message: "Invalid request." }, { status: 400 });
-        const { matterId, effort, question, history, runId } = parsed.data;
+        const { matterId, effort, question, history, runId, document: doc } = parsed.data;
+        const mode = parsed.data.mode ?? "assist";
 
         let ctx: string;
         try {
-          ctx = await matterContext(auth.supabase, matterId, effort, effort === "advanced");
+          // In draft mode the open document carries the text; other files are listed by name only.
+          ctx = await matterContext(auth.supabase, matterId, effort, mode === "assist" && effort === "advanced");
         } catch (e) {
           return Response.json(
             { message: e instanceof Error ? e.message : "Matter not found" },
@@ -41,9 +56,24 @@ export const Route = createFileRoute("/api/assist")({
           );
         }
         // Library grounding: pinned sources first, then the practice area's topic. Never fatal.
-        const sources = await matterSources(auth.supabase, matterId, undefined, queriesFromText(question), effort).catch(
+        const sources = await matterSources(auth.supabase, matterId, undefined, queriesFromText(`${question} ${doc?.selection ?? ""}`), effort).catch(
           () => ({ block: "", meta: [] as { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null }[] }),
         );
+
+        let docBlock = "";
+        if (doc) {
+          const budget = DOC_BUDGET[effort];
+          const sel = doc.selection?.trim();
+          let text = doc.text;
+          if (text.length > budget) {
+            // Keep the start (definitions, parties) and a window around the selection when there is one.
+            const head = text.slice(0, Math.floor(budget * 0.6));
+            const at = sel ? text.indexOf(sel.slice(0, 200)) : -1;
+            const tail = at > head.length ? text.slice(Math.max(head.length, at - Math.floor(budget * 0.1)), at + Math.floor(budget * 0.3)) : text.slice(-Math.floor(budget * 0.4));
+            text = `${head}\n[… ${text.length - head.length - tail.length} characters omitted …]\n${tail}`;
+          }
+          docBlock = `\n\nOPEN DOCUMENT (${doc.kind}): ${doc.name}\n${text || "[no readable text]"}${sel ? `\n\nSELECTION:\n${sel}` : ""}`;
+        }
 
         const enc = new TextEncoder();
         const line = (o: unknown) => enc.encode(JSON.stringify(o) + "\n");
@@ -60,8 +90,8 @@ export const Route = createFileRoute("/api/assist")({
         try {
           stream = aiStream(
             effort,
-            askInstructions(effort),
-            `${ctx}\n\n${sources.block}\n\nATTORNEY REQUEST:\n${question}`,
+            mode === "draft" ? draftInstructions(effort, doc?.kind ?? "docx") : askInstructions(effort),
+            `${ctx}${docBlock}\n\n${sources.block}\n\nATTORNEY REQUEST:\n${question}`,
             {
               ...(history ? { history } : {}),
               ...(runId ? { runId } : {}),
