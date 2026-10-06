@@ -28,9 +28,13 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
   const [wasmUrl, setWasmUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const registryRef = useRef<Registry | null>(null);
-  const url = useMemo(() => URL.createObjectURL(blob), [blob]);
+  const [url, setUrl] = useState<string | null>(null);
   const docId = useMemo(() => `doc-${crypto.randomUUID().slice(0, 8)}`, []);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  useEffect(() => {
+    const u = URL.createObjectURL(blob);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [blob]);
 
   useEffect(() => {
     let disposed = false;
@@ -105,7 +109,7 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
         <p className="mt-1 text-muted-foreground">{failed}</p>
       </div>
     );
-  if (!Viewer || !wasmUrl)
+  if (!Viewer || !wasmUrl || !url)
     return (
       <div className="flex h-full items-start justify-center bg-raised p-6">
         <div className="w-full max-w-3xl space-y-3 rounded border bg-card p-10 shadow-sm">
