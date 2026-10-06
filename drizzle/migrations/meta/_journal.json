@@ -22,6 +22,13 @@
       "when": 1791292724744,
       "tag": "0002_seed_law_library_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791293998524,
+      "tag": "0003_matter_properties_flags_and_periods",
+      "breakpoints": true
     }
   ]
 }

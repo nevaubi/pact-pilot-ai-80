@@ -542,17 +542,22 @@ export type Database = {
         Row: {
           acceptance_date: string | null
           address: string | null
+          attorney_review_days: number
           city: string | null
           closing_date: string | null
           county: string
+          earnest_days: number | null
           earnest_money: number | null
+          flags: Json
           in_chicago: boolean
+          inspection_days: number
           last_tax_bill: number | null
           lender: string | null
           loan_amount: number | null
           matter_id: string
           notes: string | null
           pin: string | null
+          prior_year_unpaid: number | null
           property_type: string
           proration_pct: number
           purchase_price: number | null
@@ -568,17 +573,22 @@ export type Database = {
         Insert: {
           acceptance_date?: string | null
           address?: string | null
+          attorney_review_days?: number
           city?: string | null
           closing_date?: string | null
           county?: string
+          earnest_days?: number | null
           earnest_money?: number | null
+          flags?: Json
           in_chicago?: boolean
+          inspection_days?: number
           last_tax_bill?: number | null
           lender?: string | null
           loan_amount?: number | null
           matter_id: string
           notes?: string | null
           pin?: string | null
+          prior_year_unpaid?: number | null
           property_type?: string
           proration_pct?: number
           purchase_price?: number | null
@@ -594,17 +604,22 @@ export type Database = {
         Update: {
           acceptance_date?: string | null
           address?: string | null
+          attorney_review_days?: number
           city?: string | null
           closing_date?: string | null
           county?: string
+          earnest_days?: number | null
           earnest_money?: number | null
+          flags?: Json
           in_chicago?: boolean
+          inspection_days?: number
           last_tax_bill?: number | null
           lender?: string | null
           loan_amount?: number | null
           matter_id?: string
           notes?: string | null
           pin?: string | null
+          prior_year_unpaid?: number | null
           property_type?: string
           proration_pct?: number
           purchase_price?: number | null
