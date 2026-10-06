@@ -57,7 +57,7 @@ function OfficePage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const u = data.user;
-      if (u) setUser({ id: u.id, name: (u.user_metadata?.full_name as string) || u.email?.split("@")[0] || "Attorney", ...(u.email ? { email: u.email } : {}) });
+      if (u) setUser({ id: u.id, name: (u.user_metadata?.["full_name"] as string) || u.email?.split("@")[0] || "Attorney", ...(u.email ? { email: u.email } : {}) });
     });
   }, []);
 
