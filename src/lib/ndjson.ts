@@ -40,9 +40,14 @@ export async function readNdjson<T extends { t: string }>(
   body: ReadableStream<Uint8Array>,
   onEvent: (e: T) => void,
   terminal: (e: T) => boolean = (e) => e.t === "done" || e.t === "error",
+  signal?: AbortSignal,
 ): Promise<{ terminal: boolean; malformed: number }> {
   const d = createNdjsonDecoder<T>();
   const reader = body.getReader();
+  // Cancel the reader on abort so a stalled body can't keep the request alive.
+  const onAbort = () => void reader.cancel().catch(() => {});
+  if (signal?.aborted) onAbort();
+  signal?.addEventListener("abort", onAbort, { once: true });
   let seen = false;
   const handle = (evs: T[]) => {
     for (const e of evs) {
@@ -58,7 +63,9 @@ export async function readNdjson<T extends { t: string }>(
     }
     handle(d.end());
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     reader.releaseLock();
   }
+  if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   return { terminal: seen, malformed: d.malformed };
 }

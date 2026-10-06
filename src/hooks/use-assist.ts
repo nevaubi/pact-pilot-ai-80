@@ -265,7 +265,7 @@ export function useAssist(o: { matterId: string; storeKey: string; effort: Effor
             qc.invalidateQueries({ queryKey: ["ai-usage"] });
           } else if (ev.t === "error")
             finish((t) => ({ status: t.a || pending.current.get(id) ? "stopped" : "error", error: ev.message, retryable: ev.retryable }));
-        });
+        }, undefined, controller.signal);
         if (mine() && !terminal)
           finish((t) => ({
             status: t.a ? "stopped" : "error",
@@ -273,10 +273,7 @@ export function useAssist(o: { matterId: string; storeKey: string; effort: Effor
             retryable: true,
           }));
       } catch (e) {
-        if (!mine() && (e as Error).name === "AbortError") {
-          // Aborted by clear/switch/unmount: the owner already cleaned up.
-          finish((t) => ({ status: t.a ? "stopped" : "error", error: t.a ? undefined : "Stopped.", retryable: true }));
-        } else if ((e as Error).name === "AbortError")
+        if ((e as Error).name === "AbortError")
           finish((t) => ({ status: t.a ? "stopped" : "error", error: t.a ? undefined : "Stopped.", retryable: true }));
         else finish({ status: "error", error: (e as Error).message, retryable: true });
       } finally {
