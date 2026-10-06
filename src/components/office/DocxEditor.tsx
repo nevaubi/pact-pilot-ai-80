@@ -189,6 +189,12 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           const r = receipt as { success?: boolean; failure?: { message?: string } } | undefined;
           if (r && r.success === false) throw new Error(r.failure?.message || "The editor declined the change.");
         };
+        const plain = (e: unknown) => {
+          const m = e instanceof Error ? e.message : "";
+          if (/no change/i.test(m)) return "The proposal is identical to the text it would replace — nothing to change.";
+          if (/read[- ]?only|viewing/i.test(m)) return "The document is in view-only mode. Switch to Editing or Suggesting first.";
+          return m || "The editor couldn't apply that change.";
+        };
         try {
           const s = await d.selection.current({ includeText: true } as never);
           const live = s && !s.empty ? (s.selectionTarget ?? s.target ?? null) : null;
