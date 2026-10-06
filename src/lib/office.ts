@@ -46,33 +46,64 @@ export function saveBlobLocally(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+export class SaveConflict extends Error {
+  constructor() {
+    super(
+      "Someone saved this file after you opened it. Your changes were not saved over theirs — download your copy, reopen the file and reapply them.",
+    );
+    this.name = "SaveConflict";
+  }
+}
+
 /**
- * Save a new version of a stored document. The new bytes go to a fresh object path (so no
- * browser or CDN cache can ever serve a stale copy) and the previous path is recorded in
- * file_versions, so nothing is lost. Returns the new storage path.
+ * Conflict-safe save. The bytes go to a fresh object path first; then one database call locks the
+ * file row, checks that its current path is still `expectedPath` (the version this editing session
+ * loaded — never re-fetched just before saving), records the old path in file_versions and points
+ * the file at the new object. If that call fails or conflicts, only the just-uploaded object is
+ * removed; the current file and its history are untouched. Returns the new storage path.
  */
-export async function saveNewVersion(file: Pick<Tables<"files">, "id" | "path" | "name" | "matter_id">, blob: Blob, o: { text?: string | null; note?: string; editedBy?: string | null } = {}) {
+export async function saveNewVersion(
+  file: Pick<Tables<"files">, "id" | "name" | "matter_id">,
+  expectedPath: string,
+  blob: Blob,
+  o: { text?: string | null; note?: string } = {},
+) {
   if (!blob.size) throw new Error("The editor produced an empty file, so nothing was saved.");
   const storage = supabase.storage.from("matter-files");
   const newPath = `${file.matter_id ?? "firm"}/${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, "_")}`;
-  const { error: upErr } = await storage.upload(newPath, blob, blob.type ? { contentType: blob.type } : undefined);
+  const { error: upErr } = await storage.upload(newPath, blob, {
+    upsert: false,
+    ...(blob.type ? { contentType: blob.type } : {}),
+  });
   if (upErr) throw new Error(humanize(upErr.message));
-  const { data: prev } = await supabase.from("files").select("size, path").eq("id", file.id).maybeSingle();
-  const prevPath = prev?.path ?? file.path;
-  const { error: vErr } = await supabase.from("file_versions").insert({ file_id: file.id, path: prevPath, size: prev?.size ?? null, note: o.note ?? null, created_by: o.editedBy ?? null });
-  if (vErr) {
-    await storage.remove([newPath]);
-    throw new Error(humanize(vErr.message));
+  const { data, error } = await supabase.rpc("save_file_version", {
+    p_file_id: file.id,
+    p_expected_path: expectedPath,
+    p_new_path: newPath,
+    p_size: blob.size,
+    p_extracted_text: o.text ?? null,
+    p_update_text: o.text !== undefined,
+    ...(o.note ? { p_note: o.note } : {}),
+  });
+  if (error) {
+    await storage.remove([newPath]).catch(() => {});
+    if (error.code === "40001" || /conflict/i.test(error.message)) throw new SaveConflict();
+    throw new Error(humanize(error.message));
   }
-  const patch: { path: string; size: number; updated_at: string; edited_by: string | null; extracted_text?: string | null } = { path: newPath, size: blob.size, updated_at: new Date().toISOString(), edited_by: o.editedBy ?? null };
-  if (o.text !== undefined) patch.extracted_text = o.text;
-  const { error: rowErr } = await supabase.from("files").update(patch).eq("id", file.id);
-  if (rowErr) throw new Error(humanize(rowErr.message));
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || row.path !== newPath) {
+    throw new Error("The save could not be confirmed. Reload the file to check its current version.");
+  }
   return newPath;
 }
 
-/** Restore a prior version: the current object becomes a version too, then the old bytes become the current file. */
-export async function restoreVersion(file: Pick<Tables<"files">, "id" | "path" | "name" | "matter_id">, version: Tables<"file_versions">, editedBy: string | null) {
+/** Restore a prior version through the same conflict-safe path; the version must belong to this file. */
+export async function restoreVersion(
+  file: Pick<Tables<"files">, "id" | "name" | "matter_id">,
+  expectedPath: string,
+  version: Tables<"file_versions">,
+) {
+  if (version.file_id !== file.id) throw new Error("That version belongs to a different file.");
   const blob = await downloadBlob(version.path);
   let text: string | null | undefined;
   try {
@@ -81,7 +112,10 @@ export async function restoreVersion(file: Pick<Tables<"files">, "id" | "path" |
   } catch {
     text = undefined;
   }
-  return saveNewVersion(file, blob, { ...(text !== undefined ? { text } : {}), note: `Restored version from ${new Date(version.created_at).toLocaleString()}`, editedBy });
+  return saveNewVersion(file, expectedPath, blob, {
+    ...(text !== undefined ? { text } : {}),
+    note: `Restored version from ${new Date(version.created_at).toLocaleString()}`,
+  });
 }
 
 /** Every storage object that belongs to these files: current bytes plus all kept versions. */
