@@ -130,7 +130,7 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
             dark: { accent: { primary: "#3B82F6" } },
           },
           documentManager: { initialDocuments: [{ url, documentId: docId, name, autoActivate: true }] },
-          annotations: { author },
+          annotations: { annotationAuthor: author },
           export: { defaultFileName: name },
           disabledCategories: ["signature"],
         }}
