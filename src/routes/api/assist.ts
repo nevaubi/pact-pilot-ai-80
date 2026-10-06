@@ -136,7 +136,7 @@ export const Route = createFileRoute("/api/assist")({
                 inputTokens: usage.inputTokens ?? undefined,
                 outputTokens: usage.outputTokens ?? undefined,
               };
-              await logRun(auth.supabase, auth.userId, matterId, "ask", effort, u);
+              await logRun(auth.supabase, auth.userId, matterId, mode === "draft" ? "draft" : "ask", effort, u);
               send({ t: "done", usage: u, runId: getRunId() ?? null });
             } catch (e) {
               const err = toAiError(e);
