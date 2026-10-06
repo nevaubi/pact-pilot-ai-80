@@ -438,7 +438,7 @@ const TurnView = memo(function TurnView(p: {
       )}
       {streaming && !t.a && !running && <p className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> Reading the file…</p>}
 
-      {structured && <ProposalCard t={t} pr={structured.proposal} errors={structured.validation.ok ? [] : structured.validation.errors} {...p} />}
+      {structured && <ProposalCard {...p} t={t} pr={structured.proposal} errors={structured.validation.ok ? [] : structured.validation.errors} />}
 
       {!structured && fence && (
         <div className="rounded-sm border">
