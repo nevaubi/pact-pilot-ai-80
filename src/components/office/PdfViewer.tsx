@@ -36,10 +36,10 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
     let disposed = false;
     (async () => {
       try {
-        const [{ PDFViewer }, wasm] = await Promise.all([import("@embedpdf/react-pdf-viewer"), import("@embedpdf/pdfium/pdfium.wasm?url")]);
+        const { PDFViewer } = await import("@embedpdf/react-pdf-viewer");
         if (disposed) return;
         setViewer(() => PDFViewer);
-        setWasmUrl(wasm.default);
+        setWasmUrl(`${window.location.origin}/wasm/pdfium.wasm`);
       } catch (e) {
         console.error("[office:pdf:init]", e);
         if (!disposed) setFailed(e instanceof Error ? e.message : "The PDF viewer couldn't start.");
