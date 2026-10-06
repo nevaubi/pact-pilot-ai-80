@@ -268,10 +268,10 @@ function LibraryPage() {
                   <tbody className="divide-y">
                     {list.map((a) => (
                       <tr key={a.id} className="cursor-pointer hover:bg-raised/60" onClick={() => setOpen(a)}>
-                        <td className="px-3 py-2 align-top">
-                          <div className="flex items-center gap-1.5">
+                        <td className="w-[17rem] max-w-[17rem] px-3 py-2 align-top">
+                          <div className="flex items-start gap-1.5">
                             <JurChip j={a.jurisdiction} />
-                            <span className="whitespace-nowrap font-mono text-xs">{a.citation}</span>
+                            <span className="font-mono text-xs leading-snug">{a.citation}</span>
                           </div>
                         </td>
                         <td className="px-3 py-2 align-top">

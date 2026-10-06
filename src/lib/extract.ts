@@ -1,5 +1,23 @@
 // Browser-side text extraction for uploaded documents (text only — no layout processing).
+
+/** pdf.js 6 prefers Math.sumPrecise and warns on every page when the browser lacks it. */
+function polyfillSumPrecise() {
+  const m = Math as unknown as { sumPrecise?: (xs: Iterable<number>) => number };
+  if (typeof m.sumPrecise === "function") return;
+  m.sumPrecise = (xs) => {
+    let sum = 0;
+    let c = 0;
+    for (const x of xs) {
+      const t = sum + x;
+      c += Math.abs(sum) >= Math.abs(x) ? sum - t + x : x - t + sum;
+      sum = t;
+    }
+    return sum + c;
+  };
+}
+
 export async function extractText(file: File, maxPages = 80): Promise<string> {
+  polyfillSumPrecise();
   const name = file.name.toLowerCase();
   if (name.endsWith(".docx")) {
     const mammoth = await import("mammoth");

@@ -102,7 +102,7 @@ export function htmlToText(html: string): string {
   }
   h = h
     .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<(script|style|noscript|svg|template|iframe|nav|header|footer|form|button|select)[\s>][\s\S]*?<\/\1>/gi, " ")
+    .replace(/<(script|style|noscript|svg|template|iframe|nav|header|footer|button|select)[\s>][\s\S]*?<\/\1>/gi, " ")
     .replace(/<(h[1-6])[^>]*>/gi, "\n\n## ")
     .replace(/<\/h[1-6]>/gi, "\n")
     .replace(/<li[^>]*>/gi, "\n- ")
