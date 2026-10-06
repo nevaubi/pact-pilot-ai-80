@@ -4,6 +4,15 @@ import ExcelJS from "exceljs";
 import { xlsxToWorkbook, type WorkbookData } from "@/lib/office";
 import { diffWorkbooks, openPackage, patchXlsx, XlsxUnsupported } from "@/lib/xlsx-package";
 
+/** jsdom's Blob lacks arrayBuffer(); FileReader works everywhere. */
+const ab = (b: Blob) =>
+  new Promise<ArrayBuffer>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as ArrayBuffer);
+    r.onerror = () => rej(r.error);
+    r.readAsArrayBuffer(b);
+  });
+
 type C = { v?: unknown; f?: string; s?: unknown };
 
 async function fixture(o: { date1904?: boolean } = {}) {
@@ -42,7 +51,7 @@ const setCell = (d: WorkbookData, sheet: string, r: number, c: number, v: C) => 
   (d.sheets[id]!.cellData[r] ??= {})[c] = v as never;
 };
 async function entries(buf: ArrayBuffer | Blob) {
-  const zip = await JSZip.loadAsync(buf instanceof Blob ? await buf.arrayBuffer() : buf);
+  const zip = await JSZip.loadAsync(buf instanceof Blob ? await ab(buf) : buf);
   const out = new Map<string, Uint8Array>();
   for (const [name, f] of Object.entries(zip.files)) if (!f.dir) out.set(name, await f.async("uint8array"));
   return out;
@@ -75,7 +84,7 @@ describe("XLSX original-package saving", () => {
       if (before.has(keep)) expect(same(before.get(keep), after.get(keep))).toBe(true);
     expect([...before.keys()].some((n) => /comments/.test(n))).toBe(true);
     const re = new ExcelJS.Workbook();
-    await re.xlsx.load(await out.arrayBuffer());
+    await re.xlsx.load(await ab(out));
     expect(re.getWorksheet("Deal")!.getCell("B3").value).toBe(75);
     expect(re.getWorksheet("Dates")!.getCell("B2").value).toBe("00123"); // literal text, not 123
     const f = re.getWorksheet("Deal")!.getCell("B4").value as { formula: string };
@@ -89,7 +98,7 @@ describe("XLSX original-package saving", () => {
     const cur = structuredClone(base);
     setCell(cur, "Deal", 4, 1, { f: "=B4*1.1" });
     const out = await patchXlsx(buf, diffWorkbooks(base, cur));
-    const zip = await JSZip.loadAsync(await out.arrayBuffer());
+    const zip = await JSZip.loadAsync(await ab(out));
     expect(await zip.file("xl/workbook.xml")!.async("string")).toMatch(/fullCalcOnLoad="1"/);
     const sheet = await zip.file("xl/worksheets/sheet1.xml")!.async("string");
     expect(sheet).toMatch(/<c r="B5"[^>]*><f>B4\*1\.1<\/f><\/c>/);
@@ -102,12 +111,12 @@ describe("XLSX original-package saving", () => {
     setCell(cur, "Deal", 2, 0, { v: "Fee", s: { bl: 1, bg: { rgb: "#ffcc00" } } });
     const before = await (await JSZip.loadAsync(buf)).file("xl/styles.xml")!.async("string");
     const out = await patchXlsx(buf, diffWorkbooks(base, cur));
-    const after = await (await JSZip.loadAsync(await out.arrayBuffer())).file("xl/styles.xml")!.async("string");
+    const after = await (await JSZip.loadAsync(await ab(out))).file("xl/styles.xml")!.async("string");
     const count = (x: string, tag: string) => (x.match(new RegExp(`<${tag}[ >]`, "g")) ?? []).length;
     expect(count(after, "xf")).toBe(count(before, "xf") + 1);
     expect(count(after, "font")).toBe(count(before, "font") + 1);
     const re = new ExcelJS.Workbook();
-    await re.xlsx.load(await out.arrayBuffer());
+    await re.xlsx.load(await ab(out));
     const c = re.getWorksheet("Deal")!.getCell("A3");
     expect(c.font?.bold).toBe(true);
     expect((c.fill as { fgColor?: { argb?: string } }).fgColor?.argb).toBe("FFFFCC00");
