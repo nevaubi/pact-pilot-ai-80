@@ -1,7 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import type { EditorHandle } from "./DocxEditor";
 import { Skeleton } from "@/components/ui/skeleton";
-import { workbookDataText, workbookToXlsx, xlsxToWorkbook, type WorkbookData } from "@/lib/office";
+import { MIME, workbookDataText, xlsxToWorkbook, type WorkbookData } from "@/lib/office";
 import { logClientError } from "@/lib/error-log";
 import { parseCellAssignments } from "@/lib/office-proposals";
 import {
@@ -184,6 +184,9 @@ export { CELL_STRING };
 export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<Api | null>(null);
+  /** Original package bytes and the workbook as imported from them: saves patch only the difference. */
+  const origRef = useRef<ArrayBuffer | null>(null);
+  const baseRef = useRef<WorkbookData | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -198,10 +201,14 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
             import("@univerjs/presets"),
             import("@univerjs/preset-sheets-core"),
             import("@univerjs/preset-sheets-core/locales/en-US"),
-            blob.arrayBuffer().then((b) => xlsxToWorkbook(b, name)),
+            blob.arrayBuffer().then(async (b) => {
+              origRef.current = b;
+              return xlsxToWorkbook(b, name);
+            }),
             import("@univerjs/preset-sheets-core/lib/index.css"),
           ]);
         if (disposed || !hostRef.current) return;
+        baseRef.current = structuredClone(data);
         const made = createUniver({
           locale: LocaleType.EN_US,
           locales: { [LocaleType.EN_US]: mergeLocales(en.default) },
@@ -318,7 +325,21 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
       export: async () => {
         const wb = apiRef.current?.getActiveWorkbook();
         if (!wb) throw new Error("The spreadsheet isn't ready yet.");
-        return workbookToXlsx(snapshotOf(wb));
+        const orig = origRef.current;
+        const base = baseRef.current;
+        if (!orig || !base) throw new Error("The original workbook isn't loaded.");
+        const { diffWorkbooks, patchXlsx } = await import("@/lib/xlsx-package");
+        const changes = diffWorkbooks(base, snapshotOf(wb));
+        // No cell changed: the exact original bytes, never a rebuilt workbook.
+        if (!changes.length) return new Blob([orig], { type: MIME.xlsx });
+        return patchXlsx(orig, changes);
+      },
+      markSaved: (saved) => {
+        const wb = apiRef.current?.getActiveWorkbook();
+        void saved.arrayBuffer().then((b) => {
+          origRef.current = b;
+          if (wb) baseRef.current = structuredClone(snapshotOf(wb));
+        });
       },
     }),
     [onDirty],
