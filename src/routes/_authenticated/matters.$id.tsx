@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ChevronLeft, Download, Pencil, Sparkle } from "lucide-react";
-import { matterQ, tableQ, matterContactsQ } from "@/lib/data";
+import { matterQ, tableQ, matterContactsQ, reviewsQ, propertyQ } from "@/lib/data";
 import { PracticeChip, StatusDot, LoadError } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -84,6 +84,12 @@ function MatterPage() {
     const table = tables[tab as keyof typeof tables];
     if (table) qc.prefetchQuery(tableQ(table, id));
     if (tab === "Contacts") qc.prefetchQuery(matterContactsQ(id));
+    if (tab === "Tax flags") qc.prefetchQuery(reviewsQ(id, "tax"));
+    if (tab === "Real Estate") {
+      qc.prefetchQuery(propertyQ(id));
+      qc.prefetchQuery(tableQ("files", id));
+      qc.prefetchQuery(tableQ("closing_items", id));
+    }
     if (tab === "Overview") {
       qc.prefetchQuery(tableQ("tasks", id));
       qc.prefetchQuery(tableQ("deadlines", id));
