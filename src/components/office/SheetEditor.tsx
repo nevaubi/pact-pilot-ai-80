@@ -208,7 +208,6 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
             import("@univerjs/preset-sheets-core/lib/index.css"),
           ]);
         if (disposed || !hostRef.current) return;
-        baseRef.current = structuredClone(data);
         const made = createUniver({
           locale: LocaleType.EN_US,
           locales: { [LocaleType.EN_US]: mergeLocales(en.default) },
@@ -219,6 +218,9 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
         // Our ExcelJS-derived data uses Univer's documented snapshot shape; locale is a plain string here.
         api.createWorkbook(data as unknown as Parameters<Api["createWorkbook"]>[0]);
         apiRef.current = api;
+        // Baseline in the editor's own snapshot format, so an untouched workbook diffs to nothing.
+        const created = api.getActiveWorkbook();
+        if (created) baseRef.current = structuredClone(snapshotOf(created));
         // Mutations (type 2) are real edits; operations are selection/scroll.
         let settled = false;
         setTimeout(() => (settled = true), 500);
@@ -336,9 +338,10 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
       },
       markSaved: (saved) => {
         const wb = apiRef.current?.getActiveWorkbook();
+        const snap = wb ? structuredClone(snapshotOf(wb)) : null;
         void saved.arrayBuffer().then((b) => {
           origRef.current = b;
-          if (wb) baseRef.current = structuredClone(snapshotOf(wb));
+          if (snap) baseRef.current = snap;
         });
       },
     }),
