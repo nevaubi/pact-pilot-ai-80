@@ -1,77 +1,60 @@
-# Meta prompt for the deep second coding pass
+# Mirza professional polish and performance pass
 
-Below is the prompt to paste into a fresh deep pass. Approving this plan starts that pass in this session; the text is also ready to copy for use elsewhere.
+## Goal
+Make Mirza feel like a precise, mature legal workspace: compact, fast, aligned, and close to the original product’s restrained Mac-app character, while preserving the existing matter workflows and attorney-controlled AI model.
 
-````text
-You are doing a deep, second-pass build of Mirza — a matter-management platform for a boutique
-transactional law firm — already scaffolded in this Lovable project (TanStack Start + Lovable Cloud +
-Lovable AI Gateway). Do not redesign it. Your job is to make the existing product genuinely solid,
-complete, and verified end to end, faithful to the original concept.
+The selected direction is **Professional monolithic grid** with the locked Mirza palette (`#0F172A`, `#172033`, `#3B82F6`, `#E5E7EB`), compact sidebar, SF Pro/Inter-like typography, low radii, hairline borders, and minimal motion.
 
-## Read first, in this order (source of truth)
-1. AGENTS.md — architecture rules: AI calls live only in src/lib/ai.functions.ts (server-only); AI never
-   writes data directly; drafts derive only from firm-uploaded house templates with [[Field]]/{{Field}}
-   blanks; document text is extracted in the browser; all firm data is shared to any signed-in user.
-2. .lovable/plan/ — the approved Phase 1 plan and scope boundaries.
-3. The founder brief below (paraphrased, binding).
+## 1. Unify the visual system
+- Tighten the global type scale, spacing, row heights, controls, dialogs, sheets, tables, and empty/loading/error states.
+- Reduce corner radii to 2–6px, remove decorative shadows and pill-heavy treatments, and use crisp borders and restrained surface contrast.
+- Keep dark mode equally deliberate, using the same hierarchy rather than simply inverting colors.
+- Preserve semantic color roles for urgency, status, practice area, destructive actions, and AI review notices.
+- Apply short 120–160ms transitions and respect reduced-motion preferences.
 
-## Founder brief (binding principles)
-Boutique transactional/compliance firms track matters with tasks, deadlines, contacts, notes, files,
-closing checklists. Every deal feels like a different transaction even when routine — support the
-attorney's judgment, don't over-process. AI is supportive, never primary: the attorney should not
-follow the AI, the AI supports the attorneys. Roughly 60% of what AI can do is enough for 99% of cases
-if it targets the painful, repetitive work: document intake, meeting notes, drafting help, closing
-checklists, catch-me-up summaries.
+## 2. Refine the application shell
+- Rebuild the navigation rail to match the chosen direction: slimmer, better aligned, clearer active state, consistent icon sizing, and compact labels.
+- Keep navigation usable at phone widths without crowding or horizontal overflow.
+- Standardize page headers into a compact fixed rhythm so titles, dates, counts, filters, and actions align across the product.
 
-## Non-negotiable product rules
-- AI runs only on an explicit click. Every AI output shows a "Review before use" banner and a short
-  "why/source" note pointing at the text it came from.
-- AI returns suggestions the user ticks/accepts in the UI; it never writes to the database directly.
-- Drafts only fill blanks of the firm's uploaded house templates; suggested edits are verbatim-anchored
-  redlines the attorney accepts or rejects. The form is never rewritten.
-- No invented facts, parties, dates or numbers. Unknown means say unknown. Tax points are flags, never advice.
-- All signed-in users see all matters (phase 1 has no roles).
-- AI model is openai/gpt-6-astra via server functions only. Normal effort = low reasoning, Advanced =
-  high. Every run is logged to ai_runs with kind, effort and token usage. Normal/Advanced effort level
-  is shown on each answer.
+## 3. Polish every primary workspace
+- **Today:** implement the selected monolithic three-column docket with compact deadline, task, and activity rows; remove unnecessary nested surfaces.
+- **Matters:** make list view the professional high-density default while retaining the user’s view choice; align search, filters, status, dates, and matter actions.
+- **Matter workspace:** compact the identity header and tabs, strengthen active-tab hierarchy, and normalize all task, deadline, closing, file, draft, note, contact, and activity rows.
+- **Contacts and Files:** replace loose card-heavy presentation with denser directory/table patterns where that improves scanning.
+- **House templates:** sharpen the library/editor split, document text area, blank markers, and upload state without changing the house-template workflow.
+- **Settings:** turn profile, appearance, AI effort, and usage into a clear administrative layout with compact metrics and tables.
+- **Assist and AI review flows:** visually subordinate AI to the matter, reduce chat-like bubbles and rounded prompts, and make effort, source/why, token usage, selection, review, accept/reject, and save states consistently professional.
+- Preserve all current functionality and current mobile behavior while restyling.
 
-## What "high quality functional" means — do all of this
-1. Verify every flow like a real user, not by reading code. For each of: sign in (+ email confirmation),
-   Today, matter create/edit and every tab (Overview, Tasks, Deadlines, Contacts, Notes, Files, Closing,
-   Drafts, Activity), document intake mapping with tick-to-add, meeting notes processing, template
-   upload + draft fill + redline accept/reject, closing checklist generation, contacts directory, files
-   hub, templates, settings — actually exercise it in the running app with real input and confirm the
-   result reads back through the UI. Signed-out or empty-state checks do not count as verification.
-2. Fix what's broken at the category level, not the instance. If one tab loses state on reload, fix the
-   pattern everywhere. If one mutation lacks a loading or error state, add them everywhere.
-3. Harden the AI paths: strict JSON schemas (object root, all properties required, no .min/.max bounds
-   in schema — state limits in the prompt text and clamp in code), NoObjectGeneratedError fallback that
-   parses the raw text, gateway error semantics surfaced in the UI (402 credits, 429 busy with backoff,
-   403 blocked, 401 configuration), streaming on every call, no timeouts or retry-on-timeout wrappers,
-   run-ID reuse across follow-ups.
-4. Data integrity: RLS enabled with `to authenticated using (true)` plus GRANTs on every public table,
-   storage policies for the files and templates buckets, correct foreign keys and cascade behavior.
-   Starter sample rows come only from migration INSERT statements — never seed on page load.
-5. UX completeness: loading, empty and error states on every list; confirmation on destructive actions;
-   toasts on mutations; full dark-mode parity using semantic tokens only (no hardcoded colors);
-   responsive down to phone width; unique head() metadata on every content route.
-6. Performance and cost: batch matter-context queries into one round trip, cap document text sent to
-   the model, log and display token usage per run.
-7. Definition of done per item: compiles clean, exercised in the browser with screenshot evidence, no
-   console/runtime errors in /tmp/observability, and the change reads back correctly through the UI.
-8. Work in priority order: (a) anything broken, (b) core non-AI matter flows, (c) AI desk features,
-   (d) polish. Do not start polish until (a)–(c) are verified.
+## 4. Make navigation and loading feel faster
+- Establish sensible query freshness and cache retention so returning to recently viewed pages does not immediately refetch unchanged data.
+- Move first-screen reads into route loading/prefetch patterns where appropriate so navigation starts data work earlier and screens avoid serial loading.
+- Replace the matter page’s eager tab loading with intent-based and active-tab prefetching, avoiding unnecessary requests for tabs the attorney never opens.
+- Split heavy, infrequent tools—OCR, PDF/Word extraction, AI panels, and drafting interfaces—behind lazy boundaries so routine Today/Matters visits do not download them.
+- Keep OCR browser-only and load its worker/runtime only when extraction or scanned-text reading is actually requested.
+- Reduce unnecessary rerenders and broad cache invalidations while keeping all saved changes immediately visible.
+- Preserve stable skeleton dimensions to prevent layout shifts.
 
-Stay inside Phase 1 scope: no time & billing, no roles/permissions, no email/calendar sync, no
-Office/PDF editor, no e-signature, no tax/international/market/case-law modules. When the existing
-build contradicts the founder brief, the brief wins — fix the build, don't preserve the deviation.
+## 5. Close the most useful remaining product gaps
+Add only workflow improvements that directly support the original brief and existing Phase 1 product:
+- One-click **Catch me up** on a matter, using the existing matter-scoped Assist behavior and saving only when the attorney chooses.
+- **Matter summary export** for tasks, deadlines, and closing status in a portable document format.
+- Better closing-checklist operations: practical reordering and multi-item status updates with confirmations and clear save feedback.
+- A focused upcoming-deadline view on Today, including a 30-day horizon and an optional responsible-attorney filter where the existing data supports it.
 
-Finish with a written report: what you verified end to end (with the evidence), what you fixed, and
-known gaps remaining.
-````
+Do not add billing, broad research, global AI prompts, public-company/complex-litigation workflows, email/calendar synchronization, e-signature, or a new document editor in this pass.
 
-## How to use it
+## 6. Verification and quality bar
+- Check every content page in light and dark mode at desktop and phone widths for alignment, clipping, overflow, text fit, keyboard focus, and readable contrast.
+- Exercise real signed-in flows for matters, lists, files/OCR entry points, templates, settings, Assist, review/accept actions, and the new workflow improvements.
+- Compare the finished Today screen against the selected direction and verify the same density and hierarchy carry through all pages.
+- Measure initial and route-level loading before and after; confirm heavy OCR/document code is absent from routine page loading.
+- Run focused tests, type checks, lint/build checks, and inspect runtime/network errors before completion.
 
-- In this chat: approve the plan and the pass runs here.
-- In a new session: paste the prompt as the first message — it points the next pass at the binding
-  docs already in the project (AGENTS.md, the archived plan), so context carries over.
+## Technical details
+- Continue with TanStack Start, TanStack Query, Lovable Cloud, and the existing semantic design tokens/components.
+- Use route/query preloading rather than effect-driven fetching for initial page data where practical.
+- Use lazy imports at browser-safe boundaries for OCR, extraction, drafting, and Assist UI.
+- Keep AI calls in the existing protected server functions/streaming route, keep every run logged, and preserve explicit-click, review-before-use, source/why, Normal/Advanced, and token-cost behavior.
+- No schema or security-policy changes unless a selected workflow cannot be delivered safely with the existing data; any such need will be verified before implementation.
