@@ -17,6 +17,9 @@ type FRange = {
   setValue: (v: string | number | boolean | null) => unknown;
   setFormula: (f: string) => unknown;
   getA1Notation: (withSheet?: boolean) => string;
+  isBlank?: () => boolean;
+  getNumberFormat?: () => string;
+  setNumberFormat?: (pattern: string) => unknown;
 };
 type FSheet = {
   getSheetName: () => string;
