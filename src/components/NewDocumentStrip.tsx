@@ -76,7 +76,7 @@ export function NewDocumentStrip({ matterId }: { matterId?: string }) {
             }}
             className="flex items-center gap-2.5 rounded border bg-card px-3 py-2 text-left text-sm transition-colors hover:border-primary/50 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <FileIcon letter={k.letter} tone={k.tone} />
+            <FileTypeIcon type={k.kind} />
             <span>
               <span className="block font-medium leading-tight">New {k.label}</span>
               <span className="block text-xs text-muted-foreground">Blank</span>
@@ -88,7 +88,7 @@ export function NewDocumentStrip({ matterId }: { matterId?: string }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {cur && <FileIcon letter={cur.letter} tone={cur.tone} />}New {cur?.label}
+              {cur && <FileTypeIcon type={cur.kind} className="h-7 w-6" />}New {cur?.label}
             </DialogTitle>
           </DialogHeader>
           <form
