@@ -209,6 +209,18 @@ export function FilesTab({ matterId }: { matterId: string }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
+                    {!f.extracted_text && f.name.toLowerCase().endsWith(".pdf") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!!busy}
+                        title="Recognise the text in this scanned PDF (runs in your browser, no AI cost)"
+                        onClick={() => readScanned(f)}
+                      >
+                        <ScanText className="mr-1.5 h-3.5 w-3.5" />
+                        Read scanned text
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
