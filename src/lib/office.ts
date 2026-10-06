@@ -58,10 +58,10 @@ export async function saveNewVersion(file: Pick<Tables<"files">, "id" | "path" |
   const { data: prev } = await supabase.from("files").select("size").eq("id", file.id).maybeSingle();
   const { error: vErr } = await supabase.from("file_versions").insert({ file_id: file.id, path: versionPath, size: prev?.size ?? null, note: o.note ?? null, created_by: o.editedBy ?? null });
   if (vErr) throw new Error(humanize(vErr.message));
-  const { error: upErr } = await storage.upload(file.path, blob, { upsert: true, contentType: blob.type || undefined });
+  const { error: upErr } = await storage.upload(file.path, blob, { upsert: true, ...(blob.type ? { contentType: blob.type } : {}) });
   if (upErr) throw new Error(humanize(upErr.message));
-  const patch: Record<string, unknown> = { size: blob.size, updated_at: new Date().toISOString(), edited_by: o.editedBy ?? null };
-  if (o.text !== undefined) patch["extracted_text"] = o.text;
+  const patch: { size: number; updated_at: string; edited_by: string | null; extracted_text?: string | null } = { size: blob.size, updated_at: new Date().toISOString(), edited_by: o.editedBy ?? null };
+  if (o.text !== undefined) patch.extracted_text = o.text;
   const { error: rowErr } = await supabase.from("files").update(patch).eq("id", file.id);
   if (rowErr) throw new Error(humanize(rowErr.message));
 }
@@ -82,7 +82,7 @@ export async function restoreVersion(file: Pick<Tables<"files">, "id" | "path" |
 /** Create a new matter file from raw bytes (used for drafts started from house templates). */
 export async function createMatterFile(matterId: string, name: string, blob: Blob, text: string | null) {
   const path = `${matterId}/${crypto.randomUUID()}-${name.replace(/[^\w.-]+/g, "_")}`;
-  const { error } = await supabase.storage.from("matter-files").upload(path, blob, { contentType: blob.type || undefined });
+  const { error } = await supabase.storage.from("matter-files").upload(path, blob, blob.type ? { contentType: blob.type } : undefined);
   if (error) throw new Error(humanize(error.message));
   const { data, error: e2 } = await supabase.from("files").insert({ matter_id: matterId, name, path, size: blob.size, extracted_text: text }).select().single();
   if (e2) {
