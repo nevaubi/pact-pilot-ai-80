@@ -515,7 +515,7 @@ export function validateSheetOps(sheetNames: string[], ops: SheetOp[]): Validati
       o.numberFormat != null &&
       (o.numberFormat.length > 64 ||
         !o.numberFormat.trim() ||
-        /[\u0000-\u001f]/.test(o.numberFormat))
+        [...o.numberFormat].some((ch) => ch.charCodeAt(0) < 32))
     )
       errors.push(`${n}: number format must be 1–64 printable characters.`);
     if (o.fill != null && !HEX.test(o.fill)) errors.push(`${n}: fill must be a #RRGGBB colour.`);
