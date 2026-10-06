@@ -3,7 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { FileText, Upload, Map, Download, ScanText } from "lucide-react";
+import { Upload, Map, Download, ScanText } from "lucide-react";
+import { FileTypeIcon, fileTypeFromName } from "@/components/FileTypeIcon";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { mapDocument } from "@/lib/ai.functions";
@@ -196,7 +197,7 @@ export function FilesTab({ matterId }: { matterId: string }) {
             <ul className="divide-y">
               {rows.map((f) => (
                 <li key={f.id} className="flex flex-wrap items-center gap-3 py-2.5">
-                  <FileText className="h-5 w-5 shrink-0 text-ink-blue" />
+                  <FileTypeIcon type={fileTypeFromName(f.name)} className="h-7 w-6" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{f.name}</p>
                     <p className="text-xs text-muted-foreground">
