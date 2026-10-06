@@ -63,6 +63,7 @@ export async function ocrPdf(
   onProgress?: (page: number, total: number) => void,
   maxPages = 40,
 ): Promise<string> {
+  polyfillSumPrecise();
   const pdfjs = await import("pdfjs-dist");
   const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
