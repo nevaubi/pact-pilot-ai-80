@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 ## Architecture rules
+- Homepage social branding is repeated on its Today and sign-in redirect destinations; why: link-preview clients following redirects still receive the Mirza preview.
 - AI calls live only in `src/lib/ai.functions.ts` (auth-protected server fns) and the streaming chat route `src/routes/api/assist.ts`, both using helpers in `src/lib/ai.server.ts` (provider, `matterContext`, `logRun`, `toAiError`); why: keeps the key server-side and logs every run to `ai_runs` for cost review.
 - The Assist chat streams over a bearer-verified server route (`authFromRequest` in `src/lib/auth.server.ts`) as NDJSON events, not a buffered server fn; why: long Advanced answers must show progressively and be stoppable.
 - `matterContext` is one embedded PostgREST select with per-file and per-effort total character caps; why: one round trip and bounded token cost.
