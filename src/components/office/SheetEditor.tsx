@@ -172,8 +172,17 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
               continue;
             }
             const range = sheet.getRange(a.cell);
+            const value = a.value.startsWith("=") ? a.value : coerce(a.value);
+            // A new number in a blank cell inherits the format of the cell above (currency, dates), like a filled-down column.
+            const wasBlank = range.isBlank?.() ?? false;
             if (a.value.startsWith("=")) range.setFormula(a.value);
-            else range.setValue(coerce(a.value));
+            else range.setValue(value);
+            if (wasBlank && (typeof value === "number" || a.value.startsWith("=")) && !(range.getNumberFormat?.() || "").replace(/General/i, "")) {
+              const m = /^([A-Z]+)(\d+)$/.exec(a.cell);
+              const above = m && Number(m[2]) > 1 ? sheet.getRange(`${m[1]}${Number(m[2]) - 1}`) : null;
+              const fmt = above?.getNumberFormat?.();
+              if (fmt && !/General/i.test(fmt)) range.setNumberFormat?.(fmt);
+            }
             touched.push(a.sheet ? `${a.sheet}!${a.cell}` : a.cell);
           }
           if (touched.length === 0) return { ok: false, reason: `No sheet named ${missing.map((m) => m.split("!")[0]).join(", ")} in this workbook.` };
