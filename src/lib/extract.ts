@@ -54,6 +54,10 @@ export async function extractText(file: File, maxPages = 80): Promise<string> {
     doc.querySelectorAll("script,style,noscript,nav,header,footer").forEach((n) => n.remove());
     return (doc.body?.innerText ?? doc.body?.textContent ?? "").replace(/\n{3,}/g, "\n\n");
   }
+  if (name.endsWith(".xlsx")) {
+    const { workbookText } = await import("./office");
+    return workbookText(await file.arrayBuffer());
+  }
   return await file.text();
 }
 
