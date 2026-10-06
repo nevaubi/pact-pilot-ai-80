@@ -28,6 +28,7 @@ import {
 import { EffortToggle, UsageNote, ReviewBanner } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { MicButton } from "@/components/MicButton";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { copyText } from "@/lib/clipboard";
 import { splitDraft } from "@/lib/office-proposals";
@@ -631,9 +632,12 @@ export function DraftPanel({
                     : "Ask about this document…"
               }
               aria-label="Drafting request"
-              className="resize-none pr-10 text-sm"
+              className="resize-none pr-20 text-sm"
             />
-            <div className="absolute bottom-1.5 right-1.5">
+            <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1">
+              <MicButton
+                onText={(t) => setQ((cur) => (cur.trim() ? `${cur.trimEnd()} ${t}` : t))}
+              />
               {busy ? (
                 <Button
                   type="button"

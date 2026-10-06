@@ -16,6 +16,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { MicButton } from "@/components/MicButton";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -393,6 +394,13 @@ export function AssistPanel({
               placeholder="Ask about this matter…"
               aria-label="Ask about this matter"
               className="min-h-0 resize-none border-0 p-1 shadow-none focus-visible:ring-0"
+            />
+            <MicButton
+              className="h-9 w-9"
+              onText={(t) => {
+                setQ((cur) => (cur.trim() ? `${cur.trimEnd()} ${t}` : t));
+                inputRef.current?.focus();
+              }}
             />
             {busy ? (
               <Button type="button" size="icon" variant="outline" onClick={stop} aria-label="Stop">
