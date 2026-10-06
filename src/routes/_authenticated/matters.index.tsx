@@ -268,7 +268,7 @@ function NewMatter() {
             client: f.client.trim() || null,
             practice_area: f.practice_area,
             summary: f.summary.trim() || null,
-            number: f.number.trim() || suggested || null,
+            number: f.number.trim() || suggested || (await nextMatterNumber().catch(() => null)),
             responsible: f.responsible.trim() || null,
             opened_on: f.opened_on || todayISO(),
           })
