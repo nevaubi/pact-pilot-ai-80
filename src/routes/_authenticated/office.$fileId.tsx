@@ -32,6 +32,10 @@ const DraftPanel = lazy(() =>
   import("@/components/office/DraftPanel").then((m) => ({ default: m.DraftPanel })),
 );
 
+const PANEL_MIN = 288;
+const PANEL_MAX = 640;
+const clampW = (w: number) => Math.max(PANEL_MIN, Math.min(PANEL_MAX, Math.round(w)));
+
 export const Route = createFileRoute("/_authenticated/office/$fileId")({
   head: () => ({
     meta: [
@@ -145,6 +149,35 @@ function OfficePage() {
   const [panel, setPanel] = useState(true);
   const [showVersions, setShowVersions] = useState(false);
   const onDirty = useCallback(() => setDirty(true), []);
+  const [panelW, setPanelW] = useState(352);
+  const [isWide, setIsWide] = useState(true);
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("mirza-panel-w"));
+    if (saved) setPanelW(clampW(saved));
+    const mq = window.matchMedia("(min-width: 768px)");
+    const on = () => {
+      setIsWide(mq.matches);
+      if (!mq.matches) setPanel(false);
+    };
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  useEffect(() => {
+    localStorage.setItem("mirza-panel-w", String(panelW));
+  }, [panelW]);
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const x0 = e.clientX;
+    const w0 = panelW;
+    const move = (ev: PointerEvent) => setPanelW(clampW(w0 + (x0 - ev.clientX)));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
 
   useEffect(() => {
     if (!dirty) return;
@@ -361,10 +394,8 @@ function OfficePage() {
           )}
         </div>
       )}
-      <div
-        className={`grid min-h-0 flex-1 ${panel && matter ? "grid-cols-[1fr_22rem]" : "grid-cols-1"}`}
-      >
-        <div className="min-h-0 min-w-0">
+      <div className="relative flex min-h-0 flex-1">
+        <div className="min-h-0 min-w-0 flex-1">
           <Suspense fallback={<Skeleton className="m-6 h-[60vh]" />}>
             {kind === "docx" && (
               <DocxEditor
@@ -407,16 +438,40 @@ function OfficePage() {
           </Suspense>
         </div>
         {panel && matter && (
-          <Suspense fallback={<div className="border-l" />}>
-            <DraftPanel
-              matterId={matter.id}
-              fileId={file.id}
-              kind={kind ?? "text"}
-              canInsert={kind === "docx" || kind === "xlsx"}
-              getDoc={getDoc}
-              editor={editor}
+          <>
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize assistant panel"
+              aria-valuemin={PANEL_MIN}
+              aria-valuemax={PANEL_MAX}
+              aria-valuenow={panelW}
+              tabIndex={0}
+              className="hidden w-1 shrink-0 cursor-col-resize border-l bg-border/40 hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none md:block"
+              onPointerDown={startResize}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") setPanelW((w) => clampW(w + 16));
+                if (e.key === "ArrowRight") setPanelW((w) => clampW(w - 16));
+              }}
             />
-          </Suspense>
+            <div
+              className="absolute inset-y-0 right-0 z-20 w-full max-w-[26rem] border-l shadow-lg md:static md:z-auto md:max-w-none md:shadow-none"
+              style={isWide ? { width: panelW } : undefined}
+            >
+              <Suspense fallback={<div className="h-full bg-card" />}>
+                <DraftPanel
+                  matterId={matter.id}
+                  fileId={file.id}
+                  fileName={file.name}
+                  kind={kind ?? "text"}
+                  canInsert={kind === "docx" || kind === "xlsx"}
+                  getDoc={getDoc}
+                  editor={editor}
+                  onClose={() => setPanel(false)}
+                />
+              </Suspense>
+            </div>
+          </>
         )}
       </div>
     </div>

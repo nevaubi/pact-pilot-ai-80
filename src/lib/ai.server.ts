@@ -139,7 +139,7 @@ function gatewayFetch(ref: { runId: string | undefined }): typeof fetch {
   };
 }
 
-function provider(runId?: string) {
+export function provider(runId?: string) {
   const apiKey = process.env["LOVABLE_API_KEY"];
   if (!apiKey) throw new AiError("Lovable AI isn't configured for this workspace.", 401);
   const ref = { runId: runId?.trim() || undefined };
@@ -160,7 +160,7 @@ Rules:
 - Be concise and plain. No legal conclusions presented as final advice. Tax points are flags for the attorney's awareness only, never advice.
 - When you point something out, briefly say why and quote or reference the source text so the attorney can verify it.`;
 
-function opts(effort: Effort) {
+export function opts(effort: Effort) {
   return {
     openai: {
       forceReasoning: true,
