@@ -11,9 +11,13 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in — Mirza" },
-      { name: "description", content: "Sign in to your firm's Mirza workspace." },
-      { property: "og:title", content: "Sign in — Mirza" },
-      { property: "og:description", content: "Sign in to your firm's Mirza workspace." },
+      { name: "description", content: "Sign in to Mirza, your firm's workspace for matters, deadlines, documents and closings with attorney-reviewed AI support." },
+      { property: "og:title", content: "Mirza — Matter management for boutique law firms" },
+      { property: "og:description", content: "Manage matters, deadlines, documents and closings in one workspace, with house-template drafting and attorney-reviewed AI support for boutique law firms." },
+      { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://pact-pilot-ai-80.lovable.app/mirza-social.jpg" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://pact-pilot-ai-80.lovable.app/mirza-social.jpg" },
     ],
   }),
   component: AuthPage,

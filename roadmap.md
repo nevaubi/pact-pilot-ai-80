@@ -21,3 +21,4 @@ Priority order: (a) broken → (b) core non-AI flows → (c) AI desk → (d) pol
 - [x] Test data cleaned (two test matters, test contact); sample house template kept as "Sample — Asset Purchase Agreement"
 
 ## Done
+- [x] Replace template favicon with Mirza M and add polished homepage social preview/name/description, including redirect destinations.
