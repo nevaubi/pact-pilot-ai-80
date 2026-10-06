@@ -194,9 +194,8 @@ function MatterPage() {
       </div>
       <div className="p-4 md:p-6">
         <Tabs value={tab}>
-          <Suspense fallback={<Skeleton className="h-48 w-full rounded" />}>
           <TabsContent value="Overview">
-            <Overview matter={m} onTab={setTab} onEdit={() => setEdit(true)} />
+            <Suspense fallback={<TabLoading />}><Overview matter={m} onTab={setTab} onEdit={() => setEdit(true)} /></Suspense>
           </TabsContent>
           <TabsContent value="Tasks">
             <TasksTab matterId={id} />
@@ -205,13 +204,13 @@ function MatterPage() {
             <DeadlinesTab matterId={id} />
           </TabsContent>
           <TabsContent value="Closing">
-            <ClosingTab matterId={id} />
+            <Suspense fallback={<TabLoading />}><ClosingTab matterId={id} /></Suspense>
           </TabsContent>
           <TabsContent value="Files">
-            <FilesTab matterId={id} />
+            <Suspense fallback={<TabLoading />}><FilesTab matterId={id} /></Suspense>
           </TabsContent>
           <TabsContent value="Drafts">
-            <DraftsTab matter={m} />
+            <Suspense fallback={<TabLoading />}><DraftsTab matter={m} /></Suspense>
           </TabsContent>
           <TabsContent value="Notes">
             <NotesTab matterId={id} />
@@ -222,11 +221,14 @@ function MatterPage() {
           <TabsContent value="Activity">
             <ActivityTab matterId={id} />
           </TabsContent>
-          </Suspense>
         </Tabs>
       </div>
       {assist && <Suspense fallback={null}><AssistPanel matter={m} open={assist} onOpenChange={setAssist} initialPrompt={assistPrompt} /></Suspense>}
       <EditMatterDialog matter={m} open={edit} onOpenChange={setEdit} />
     </div>
   );
+}
+
+function TabLoading() {
+  return <Skeleton className="h-48 w-full rounded" />;
 }
