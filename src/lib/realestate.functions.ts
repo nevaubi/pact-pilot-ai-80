@@ -104,7 +104,7 @@ Rules:
 - Cross-reference: for each exception, say what the survey shows (quoted) if a survey is provided; for each survey finding, name the exception it relates to.
 - Where a legal point is involved (lien waivers, transfer tax, FIRPTA, condominium disclosures), cite a SOURCE tag with a verbatim quote; otherwise leave basis empty.
 - Be concise and customary. Do not invent parties, dates or amounts; use "unknown" when the document is silent.`,
-        `${ctx}\n\n${propLine}\n\n${src.block}\n\n${doc(data.commitmentId, "TITLE COMMITMENT")}\n${doc(data.surveyId, "PLAT OF SURVEY")}\n${doc(data.contractId, "CONTRACT")}\n${data.instruction ? `ATTORNEY INSTRUCTION: ${data.instruction}\n` : ""}Review now.`,
+        `${ctx}\n\n${src.block}\n\n${doc(data.commitmentId, "TITLE COMMITMENT")}\n${doc(data.surveyId, "PLAT OF SURVEY")}\n${doc(data.contractId, "CONTRACT")}\n${data.instruction ? `ATTORNEY INSTRUCTION: ${data.instruction}\n` : ""}Review now.`,
         schema,
       );
       const flags = r.output.flags.map((f) => {
