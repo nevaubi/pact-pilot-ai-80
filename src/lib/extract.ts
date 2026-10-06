@@ -25,7 +25,8 @@ export async function extractText(file: File): Promise<string> {
 /** Template blanks: [[Field Name]] or {{Field Name}} */
 export function templateFields(body: string): string[] {
   const set = new Set<string>();
-  for (const m of body.matchAll(/\[\[([^\]]+)\]\]|\{\{([^}]+)\}\}/g)) set.add((m[1] ?? m[2] ?? "").trim());
+  for (const m of body.matchAll(/\[\[([^\]]+)\]\]|\{\{([^}]+)\}\}/g))
+    set.add((m[1] ?? m[2] ?? "").trim());
   return [...set];
 }
 

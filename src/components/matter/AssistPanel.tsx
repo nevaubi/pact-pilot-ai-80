@@ -8,17 +8,39 @@ import { useEffort } from "@/hooks/use-effort";
 import { logActivity } from "@/lib/data";
 import { mut, tryAction } from "@/lib/mutate";
 import { EffortToggle, UsageNote, ReviewBanner, type Effort } from "@/components/kit";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 type Usage = { inputTokens?: number | undefined; outputTokens?: number | undefined };
-type Turn = { id: string; q: string; a: string; effort: Effort; usage?: Usage | undefined; status: "streaming" | "done" | "stopped" | "error"; error?: string | undefined; retryable?: boolean | undefined };
+type Turn = {
+  id: string;
+  q: string;
+  a: string;
+  effort: Effort;
+  usage?: Usage | undefined;
+  status: "streaming" | "done" | "stopped" | "error";
+  error?: string | undefined;
+  retryable?: boolean | undefined;
+};
 
 const VERBS: Record<string, string[] | undefined> = {
-  common: ["Catch me up", "What's due in the next two weeks?", "Draft a status email to the client"],
-  Corporate: ["List customary diligence items still open", "Flag tax points to raise with the client's CPA"],
+  common: [
+    "Catch me up",
+    "What's due in the next two weeks?",
+    "Draft a status email to the client",
+  ],
+  Corporate: [
+    "List customary diligence items still open",
+    "Flag tax points to raise with the client's CPA",
+  ],
   "Real Estate": ["What title and survey items should I check?", "Outline the path to closing"],
   "Estate Planning": ["Summarize the client's goals", "Which documents does this plan need?"],
   Finance: ["Which terms look off-market for a deal this size?", "Where does the closing stand?"],
@@ -37,7 +59,15 @@ function loadTurns(id: string): Turn[] {
   }
 }
 
-export function AssistPanel({ matter, open, onOpenChange }: { matter: Tables<"matters">; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function AssistPanel({
+  matter,
+  open,
+  onOpenChange,
+}: {
+  matter: Tables<"matters">;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
   const [effort, setEffort] = useEffort();
   const [q, setQ] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -50,23 +80,40 @@ export function AssistPanel({ matter, open, onOpenChange }: { matter: Tables<"ma
 
   // Persist per matter for the browser session; `hydrated` guards against writing the initial empty state over saved history.
   const [hydrated, setHydrated] = useState<string | null>(null);
-  useEffect(() => { setTurns(loadTurns(matter.id)); setHydrated(matter.id); runIdRef.current = undefined; }, [matter.id]);
+  useEffect(() => {
+    setTurns(loadTurns(matter.id));
+    setHydrated(matter.id);
+    runIdRef.current = undefined;
+  }, [matter.id]);
   useEffect(() => {
     if (hydrated !== matter.id) return;
-    try { sessionStorage.setItem(storeKey(matter.id), JSON.stringify(turns.slice(-20))); } catch { /* quota */ }
+    try {
+      sessionStorage.setItem(storeKey(matter.id), JSON.stringify(turns.slice(-20)));
+    } catch {
+      /* quota */
+    }
   }, [turns, hydrated, matter.id]);
-  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 80); }, [open, busy]);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [turns]);
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 80);
+  }, [open, busy]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [turns]);
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const patch = (id: string, p: Partial<Turn> | ((t: Turn) => Partial<Turn>)) =>
-    setTurns((ts) => ts.map((t) => (t.id === id ? { ...t, ...(typeof p === "function" ? p(t) : p) } : t)));
+    setTurns((ts) =>
+      ts.map((t) => (t.id === id ? { ...t, ...(typeof p === "function" ? p(t) : p) } : t)),
+    );
 
   async function send(text: string, replaceId?: string) {
     const question = text.trim();
     if (!question || busy) return;
     const id = replaceId ?? crypto.randomUUID();
-    const history = turns.filter((t) => t.status === "done" && t.id !== replaceId).slice(-6).map(({ q, a }) => ({ q, a }));
+    const history = turns
+      .filter((t) => t.status === "done" && t.id !== replaceId)
+      .slice(-6)
+      .map(({ q, a }) => ({ q, a }));
     const turn: Turn = { id, q: question, a: "", effort, status: "streaming" };
     setTurns((ts) => (replaceId ? ts.map((t) => (t.id === replaceId ? turn : t)) : [...ts, turn]));
     setQ("");
@@ -80,12 +127,22 @@ export function AssistPanel({ matter, open, onOpenChange }: { matter: Tables<"ma
       const res = await fetch("/api/assist", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ matterId: matter.id, effort, question, history, ...(runIdRef.current ? { runId: runIdRef.current } : {}) }),
+        body: JSON.stringify({
+          matterId: matter.id,
+          effort,
+          question,
+          history,
+          ...(runIdRef.current ? { runId: runIdRef.current } : {}),
+        }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {
         const j = (await res.json().catch(() => ({}))) as { message?: string; retryable?: boolean };
-        patch(id, { status: "error", error: j.message ?? `AI request failed (${res.status}).`, retryable: j.retryable ?? (res.status === 429 || res.status >= 500) });
+        patch(id, {
+          status: "error",
+          error: j.message ?? `AI request failed (${res.status}).`,
+          retryable: j.retryable ?? (res.status === 429 || res.status >= 500),
+        });
         return;
       }
       runIdRef.current = res.headers.get("X-Lovable-AIG-Run-ID") ?? runIdRef.current;
@@ -100,16 +157,41 @@ export function AssistPanel({ matter, open, onOpenChange }: { matter: Tables<"ma
         buf = lines.pop() ?? "";
         for (const l of lines) {
           if (!l.trim()) continue;
-          const ev = JSON.parse(l) as { t: "delta"; text: string } | { t: "done"; usage: Usage; runId: string | null } | { t: "error"; message: string; retryable: boolean };
+          const ev = JSON.parse(l) as
+            | { t: "delta"; text: string }
+            | { t: "done"; usage: Usage; runId: string | null }
+            | { t: "error"; message: string; retryable: boolean };
           if (ev.t === "delta") patch(id, (t) => ({ a: t.a + ev.text }));
-          else if (ev.t === "done") { patch(id, { status: "done", usage: ev.usage }); if (ev.runId) runIdRef.current = ev.runId; qc.invalidateQueries({ queryKey: ["ai-usage"] }); }
-          else patch(id, (t) => ({ status: t.a ? "stopped" : "error", error: ev.message, retryable: ev.retryable }));
+          else if (ev.t === "done") {
+            patch(id, { status: "done", usage: ev.usage });
+            if (ev.runId) runIdRef.current = ev.runId;
+            qc.invalidateQueries({ queryKey: ["ai-usage"] });
+          } else
+            patch(id, (t) => ({
+              status: t.a ? "stopped" : "error",
+              error: ev.message,
+              retryable: ev.retryable,
+            }));
         }
       }
       // Stream ended without a terminal event (connection dropped) — keep what we have.
-      setTurns((ts) => ts.map((t) => (t.id === id && t.status === "streaming" ? { ...t, status: t.a ? "stopped" : "error", error: t.a ? undefined : "The connection dropped before an answer arrived." } : t)));
+      setTurns((ts) =>
+        ts.map((t) =>
+          t.id === id && t.status === "streaming"
+            ? {
+                ...t,
+                status: t.a ? "stopped" : "error",
+                error: t.a ? undefined : "The connection dropped before an answer arrived.",
+              }
+            : t,
+        ),
+      );
     } catch (e) {
-      if ((e as Error).name === "AbortError") patch(id, (t) => ({ status: t.a ? "stopped" : "error", error: t.a ? undefined : "Stopped." }));
+      if ((e as Error).name === "AbortError")
+        patch(id, (t) => ({
+          status: t.a ? "stopped" : "error",
+          error: t.a ? undefined : "Stopped.",
+        }));
       else patch(id, { status: "error", error: (e as Error).message, retryable: true });
     } finally {
       setBusy(false);
@@ -117,12 +199,29 @@ export function AssistPanel({ matter, open, onOpenChange }: { matter: Tables<"ma
     }
   }
 
-  function stop() { abortRef.current?.abort(); }
-  function clear() { abortRef.current?.abort(); setTurns([]); runIdRef.current = undefined; }
+  function stop() {
+    abortRef.current?.abort();
+  }
+  function clear() {
+    abortRef.current?.abort();
+    setTurns([]);
+    runIdRef.current = undefined;
+  }
 
   async function saveAsNote(t: Turn) {
     await tryAction(async () => {
-      await mut(supabase.from("notes").insert({ matter_id: matter.id, title: `Assist: ${t.q.slice(0, 80)}`, body: t.a, kind: "assist" }).select("id"), { success: "Saved to Notes" });
+      await mut(
+        supabase
+          .from("notes")
+          .insert({
+            matter_id: matter.id,
+            title: `Assist: ${t.q.slice(0, 80)}`,
+            body: t.a,
+            kind: "assist",
+          })
+          .select("id"),
+        { success: "Saved to Notes" },
+      );
       await logActivity(matter.id, `Saved an Assist answer to notes: "${t.q.slice(0, 60)}"`);
       qc.invalidateQueries({ queryKey: ["notes", matter.id] });
       qc.invalidateQueries({ queryKey: ["activity", matter.id] });
@@ -137,47 +236,98 @@ export function AssistPanel({ matter, open, onOpenChange }: { matter: Tables<"ma
       <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
         <SheetHeader className="border-b p-4 text-left">
           <SheetTitle className="flex items-center gap-2">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ink-purple text-primary-foreground"><Sparkle className="h-4 w-4" /></span>
-            <span className="truncate">Assist · <span className="font-normal text-muted-foreground">{matter.title}</span></span>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ink-purple text-primary-foreground">
+              <Sparkle className="h-4 w-4" />
+            </span>
+            <span className="truncate">
+              Assist · <span className="font-normal text-muted-foreground">{matter.title}</span>
+            </span>
           </SheetTitle>
-          <SheetDescription className="sr-only">Ask about this matter. Answers are suggestions for your review.</SheetDescription>
+          <SheetDescription className="sr-only">
+            Ask about this matter. Answers are suggestions for your review.
+          </SheetDescription>
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
             <EffortToggle value={effort} onChange={setEffort} />
-            <span className="text-[11px] text-muted-foreground">{effort === "normal" ? "Case management & drafting help" : "Deeper analysis, issue-spotting"}</span>
+            <span className="text-[11px] text-muted-foreground">
+              {effort === "normal"
+                ? "Case management & drafting help"
+                : "Deeper analysis, issue-spotting"}
+            </span>
           </div>
         </SheetHeader>
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {!turns.length && (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Assist only looks at this matter — its summary, tasks, deadlines, notes and files. It prepares; you review and decide.</p>
+              <p className="text-sm text-muted-foreground">
+                Assist only looks at this matter — its summary, tasks, deadlines, notes and files.
+                It prepares; you review and decide.
+              </p>
               <div className="flex flex-wrap gap-2">
                 {verbs.map((v) => (
-                  <button key={v} onClick={() => send(v)} className="rounded-full border bg-raised px-3 py-1.5 text-xs transition-colors hover:border-ink-purple hover:text-ink-purple">{v}</button>
+                  <button
+                    key={v}
+                    onClick={() => send(v)}
+                    className="rounded-full border bg-raised px-3 py-1.5 text-xs transition-colors hover:border-ink-purple hover:text-ink-purple"
+                  >
+                    {v}
+                  </button>
                 ))}
               </div>
             </div>
           )}
           {turns.map((t) => (
             <div key={t.id} className="space-y-2">
-              <div className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-foreground px-3 py-2 text-sm text-background">{t.q}</div>
+              <div className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-foreground px-3 py-2 text-sm text-background">
+                {t.q}
+              </div>
               {t.a || t.status !== "streaming" ? (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                     <UsageNote effort={t.effort} usage={t.usage} />
-                    {t.status === "stopped" && <span className="rounded bg-raised px-1.5 py-0.5">stopped early</span>}
+                    {t.status === "stopped" && (
+                      <span className="rounded bg-raised px-1.5 py-0.5">stopped early</span>
+                    )}
                   </div>
-                  {t.a && <div className="md text-sm"><ReactMarkdown>{t.a}</ReactMarkdown></div>}
-                  {t.status === "streaming" && <span className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-ink-purple align-text-bottom" aria-label="Writing…" />}
+                  {t.a && (
+                    <div className="md text-sm">
+                      <ReactMarkdown>{t.a}</ReactMarkdown>
+                    </div>
+                  )}
+                  {t.status === "streaming" && (
+                    <span
+                      className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-ink-purple align-text-bottom"
+                      aria-label="Writing…"
+                    />
+                  )}
                   {t.status === "error" && (
                     <div className="rounded-lg border border-ink-red/30 bg-ink-red/5 px-3 py-2 text-sm">
                       <p>{t.error}</p>
-                      {t.retryable !== false && <Button size="sm" variant="outline" className="mt-2" onClick={() => send(t.q, t.id)} disabled={busy}><RotateCcw className="mr-1 h-3.5 w-3.5" />Try again</Button>}
+                      {t.retryable !== false && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2"
+                          onClick={() => send(t.q, t.id)}
+                          disabled={busy}
+                        >
+                          <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                          Try again
+                        </Button>
+                      )}
                     </div>
                   )}
                   {(t.status === "done" || t.status === "stopped") && t.a && (
                     <div className="flex flex-wrap items-center gap-1">
                       <CopyButton text={t.a} />
-                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => saveAsNote(t)}><StickyNote className="mr-1 h-3.5 w-3.5" />Save to notes</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs"
+                        onClick={() => saveAsNote(t)}
+                      >
+                        <StickyNote className="mr-1 h-3.5 w-3.5" />
+                        Save to notes
+                      </Button>
                       {t === lastDone && <span className="ml-auto" />}
                     </div>
                   )}
@@ -185,36 +335,64 @@ export function AssistPanel({ matter, open, onOpenChange }: { matter: Tables<"ma
                 </div>
               ) : (
                 <div className="flex items-center gap-2 py-2 text-xs text-muted-foreground">
-                  <span className="flex gap-1"><span className="h-2 w-2 animate-bounce rounded-full bg-ink-purple" /><span className="h-2 w-2 animate-bounce rounded-full bg-ink-purple [animation-delay:120ms]" /><span className="h-2 w-2 animate-bounce rounded-full bg-ink-purple [animation-delay:240ms]" /></span>
-                  {t.effort === "advanced" ? "Reading the matter and its documents carefully…" : "Reading the matter…"}
+                  <span className="flex gap-1">
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-ink-purple" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-ink-purple [animation-delay:120ms]" />
+                    <span className="h-2 w-2 animate-bounce rounded-full bg-ink-purple [animation-delay:240ms]" />
+                  </span>
+                  {t.effort === "advanced"
+                    ? "Reading the matter and its documents carefully…"
+                    : "Reading the matter…"}
                 </div>
               )}
             </div>
           ))}
           <div ref={endRef} />
         </div>
-        <form className="border-t p-3" onSubmit={(e) => { e.preventDefault(); send(q); }}>
+        <form
+          className="border-t p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            send(q);
+          }}
+        >
           <div className="flex items-end gap-2 rounded-xl border bg-card p-2">
             <Textarea
               ref={inputRef}
               rows={2}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(q); } }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  send(q);
+                }
+              }}
               placeholder="Ask about this matter…"
               aria-label="Ask about this matter"
               className="min-h-0 resize-none border-0 p-1 shadow-none focus-visible:ring-0"
             />
             {busy ? (
-              <Button type="button" size="icon" variant="outline" onClick={stop} aria-label="Stop"><Square className="h-4 w-4" /></Button>
+              <Button type="button" size="icon" variant="outline" onClick={stop} aria-label="Stop">
+                <Square className="h-4 w-4" />
+              </Button>
             ) : (
-              <Button type="submit" size="icon" disabled={!q.trim()} aria-label="Send"><Send className="h-4 w-4" /></Button>
+              <Button type="submit" size="icon" disabled={!q.trim()} aria-label="Send">
+                <Send className="h-4 w-4" />
+              </Button>
             )}
           </div>
           {turns.length > 0 && (
             <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
               <span>Follow-ups remember the last few answers.</span>
-              <button type="button" onClick={clear} className="inline-flex items-center gap-1 hover:text-foreground"><Trash2 className="h-3 w-3" />Clear conversation</button>
+              <button
+                type="button"
+                onClick={clear}
+                className="inline-flex items-center gap-1 hover:text-foreground"
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear conversation
+              </button>
             </div>
           )}
         </form>
@@ -240,7 +418,11 @@ function CopyButton({ text }: { text: string }) {
         }
       }}
     >
-      {ok ? <Check className="mr-1 h-3.5 w-3.5 text-ink-green" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
+      {ok ? (
+        <Check className="mr-1 h-3.5 w-3.5 text-ink-green" />
+      ) : (
+        <Copy className="mr-1 h-3.5 w-3.5" />
+      )}
       {ok ? "Copied" : "Copy"}
     </Button>
   );

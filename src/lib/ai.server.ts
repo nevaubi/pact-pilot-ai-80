@@ -29,7 +29,7 @@ function safeMessageFromBody(body: string | undefined): string | undefined {
   if (!body) return undefined;
   try {
     const j = JSON.parse(body) as { error?: { message?: string } | string; message?: string };
-    const m = typeof j.error === "string" ? j.error : j.error?.message ?? j.message;
+    const m = typeof j.error === "string" ? j.error : (j.error?.message ?? j.message);
     return typeof m === "string" && m.length < 400 ? m : undefined;
   } catch {
     return undefined;
@@ -37,23 +37,50 @@ function safeMessageFromBody(body: string | undefined): string | undefined {
 }
 
 /** Gateway status → message an attorney can act on (see ai-gateway-error-semantics). */
-export function describeStatus(status: number, upstream?: string): { message: string; retryable: boolean } {
+export function describeStatus(
+  status: number,
+  upstream?: string,
+): { message: string; retryable: boolean } {
   switch (status) {
     case 400:
-      return { message: "The request was too large or malformed for the model. Try a shorter document or question.", retryable: false };
+      return {
+        message:
+          "The request was too large or malformed for the model. Try a shorter document or question.",
+        retryable: false,
+      };
     case 401:
-      return { message: "Lovable AI isn't configured for this workspace. Ask your administrator to check the AI key.", retryable: false };
+      return {
+        message:
+          "Lovable AI isn't configured for this workspace. Ask your administrator to check the AI key.",
+        retryable: false,
+      };
     case 402:
-      return { message: upstream ?? "Your workspace is out of AI credits. Add credits in Settings → Plans & credits, then try again.", retryable: false };
+      return {
+        message:
+          upstream ??
+          "Your workspace is out of AI credits. Add credits in Settings → Plans & credits, then try again.",
+        retryable: false,
+      };
     case 403:
-      return { message: upstream ?? "AI access is blocked for this workspace. A workspace admin can review the AI limit in workspace settings.", retryable: false };
+      return {
+        message:
+          upstream ??
+          "AI access is blocked for this workspace. A workspace admin can review the AI limit in workspace settings.",
+        retryable: false,
+      };
     case 404:
       return { message: "The AI model isn't available right now.", retryable: false };
     case 429:
-      return { message: "AI is busy right now. Please wait a moment and try again.", retryable: true };
+      return {
+        message: "AI is busy right now. Please wait a moment and try again.",
+        retryable: true,
+      };
     default:
       return status >= 500
-        ? { message: "The AI service had a temporary problem. Please try again in a minute.", retryable: true }
+        ? {
+            message: "The AI service had a temporary problem. Please try again in a minute.",
+            retryable: true,
+          }
         : { message: upstream ?? `AI request failed (${status}).`, retryable: false };
   }
 }
@@ -66,7 +93,12 @@ export function toAiError(e: unknown): AiError {
     const d = describeStatus(status, safeMessageFromBody(e.responseBody));
     return new AiError(d.message, status, d.retryable);
   }
-  if (NoObjectGeneratedError.isInstance(e)) return new AiError("The AI answer couldn't be read as a structured result. Please try again.", undefined, true);
+  if (NoObjectGeneratedError.isInstance(e))
+    return new AiError(
+      "The AI answer couldn't be read as a structured result. Please try again.",
+      undefined,
+      true,
+    );
   if (e instanceof Error) {
     if (e.name === "AbortError") return new AiError("Stopped.", 499, false);
     if (/credits/i.test(e.message)) return new AiError(e.message, 402, false);
@@ -140,7 +172,9 @@ function opts(effort: Effort) {
   } as const;
 }
 
-function normalizeUsage(u: { inputTokens?: number | undefined; outputTokens?: number | undefined } | undefined): Usage {
+function normalizeUsage(
+  u: { inputTokens?: number | undefined; outputTokens?: number | undefined } | undefined,
+): Usage {
   return { inputTokens: u?.inputTokens ?? undefined, outputTokens: u?.outputTokens ?? undefined };
 }
 
@@ -153,7 +187,12 @@ function messages(prompt: string, history: Turn[] | undefined) {
 }
 
 /** Start a streaming text call. Caller consumes `result` (textStream / text / usage). */
-export function aiStream(effort: Effort, instructions: string, prompt: string, o: { history?: Turn[]; runId?: string; signal?: AbortSignal } = {}) {
+export function aiStream(
+  effort: Effort,
+  instructions: string,
+  prompt: string,
+  o: { history?: Turn[]; runId?: string; signal?: AbortSignal } = {},
+) {
   const p = provider(o.runId);
   const result = streamText({
     model: p.model,
@@ -167,7 +206,12 @@ export function aiStream(effort: Effort, instructions: string, prompt: string, o
 }
 
 /** Full text answer (streamed from the gateway, returned whole). */
-export async function aiText(effort: Effort, instructions: string, prompt: string, o: { history?: Turn[]; runId?: string } = {}) {
+export async function aiText(
+  effort: Effort,
+  instructions: string,
+  prompt: string,
+  o: { history?: Turn[]; runId?: string } = {},
+) {
   const { result, getRunId } = aiStream(effort, instructions, prompt, o);
   try {
     const text = await result.text;
@@ -179,7 +223,10 @@ export async function aiText(effort: Effort, instructions: string, prompt: strin
 }
 
 function stripFences(s: string) {
-  return s.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  return s
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
 }
 
 /** Structured answer against a strict schema, with a raw-text fallback if the SDK can't parse it. */
@@ -207,9 +254,18 @@ export async function aiObject<T extends z.ZodTypeAny>(
     if (!NoObjectGeneratedError.isInstance(e)) throw err;
     // Fallback: the model answered but the SDK couldn't parse it — try the raw text ourselves.
     const text = await Promise.resolve(result.text).catch(() => "");
-    const parsed = schema.safeParse((() => { try { return JSON.parse(stripFences(text)); } catch { return undefined; } })());
+    const parsed = schema.safeParse(
+      (() => {
+        try {
+          return JSON.parse(stripFences(text));
+        } catch {
+          return undefined;
+        }
+      })(),
+    );
     const usage = await Promise.resolve(result.usage).catch(() => undefined);
-    if (parsed.success) return { output: parsed.data, usage: normalizeUsage(usage), runId: p.getRunId() };
+    if (parsed.success)
+      return { output: parsed.data, usage: normalizeUsage(usage), runId: p.getRunId() };
     throw err;
   }
 }
@@ -222,7 +278,12 @@ const DOC_CHARS_PER_FILE = 12_000;
 const DOC_CHARS_TOTAL: Record<Effort, number> = { normal: 30_000, advanced: 90_000 };
 
 /** One round trip: the matter plus its lists, rendered as plain text for the model. */
-export async function matterContext(supabase: DB, matterId: string, effort: Effort, includeDocs = false) {
+export async function matterContext(
+  supabase: DB,
+  matterId: string,
+  effort: Effort,
+  includeDocs = false,
+) {
   const { data: m, error } = await supabase
     .from("matters")
     .select(
@@ -242,7 +303,8 @@ export async function matterContext(supabase: DB, matterId: string, effort: Effo
   let budget = DOC_CHARS_TOTAL[effort];
   const docs = m.files
     .map((f) => {
-      if (!includeDocs || !f.extracted_text || budget <= 0) return `- ${f.name}${f.extracted_text ? "" : " (no readable text)"}`;
+      if (!includeDocs || !f.extracted_text || budget <= 0)
+        return `- ${f.name}${f.extracted_text ? "" : " (no readable text)"}`;
       const slice = f.extracted_text.slice(0, Math.min(DOC_CHARS_PER_FILE, budget));
       budget -= slice.length;
       return `--- ${f.name} ---\n${slice}${slice.length < f.extracted_text.length ? "\n[…truncated]" : ""}`;
@@ -265,7 +327,14 @@ Files:
 ${docs || "none"}`;
 }
 
-export async function logRun(supabase: DB, userId: string, matterId: string | null, kind: string, effort: Effort, usage: Usage) {
+export async function logRun(
+  supabase: DB,
+  userId: string,
+  matterId: string | null,
+  kind: string,
+  effort: Effort,
+  usage: Usage,
+) {
   const { error } = await supabase.from("ai_runs").insert({
     matter_id: matterId,
     user_id: userId,

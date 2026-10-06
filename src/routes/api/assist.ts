@@ -9,7 +9,10 @@ const bodyZ = z.object({
   matterId: z.string().uuid(),
   effort: z.enum(["normal", "advanced"]),
   question: z.string().min(1).max(4000),
-  history: z.array(z.object({ q: z.string().max(4000), a: z.string().max(20000) })).max(8).optional(),
+  history: z
+    .array(z.object({ q: z.string().max(4000), a: z.string().max(20000) }))
+    .max(8)
+    .optional(),
   runId: z.string().max(200).optional(),
 });
 
@@ -18,7 +21,8 @@ export const Route = createFileRoute("/api/assist")({
     handlers: {
       POST: async ({ request }) => {
         const { authFromRequest } = await import("@/lib/auth.server");
-        const { aiStream, matterContext, askInstructions, logRun, toAiError } = await import("@/lib/ai.server");
+        const { aiStream, matterContext, askInstructions, logRun, toAiError } =
+          await import("@/lib/ai.server");
 
         const auth = await authFromRequest(request).catch(() => null);
         if (!auth) return Response.json({ message: "Please sign in again." }, { status: 401 });
@@ -31,7 +35,10 @@ export const Route = createFileRoute("/api/assist")({
         try {
           ctx = await matterContext(auth.supabase, matterId, effort, effort === "advanced");
         } catch (e) {
-          return Response.json({ message: e instanceof Error ? e.message : "Matter not found" }, { status: 404 });
+          return Response.json(
+            { message: e instanceof Error ? e.message : "Matter not found" },
+            { status: 404 },
+          );
         }
 
         const enc = new TextEncoder();
@@ -39,16 +46,24 @@ export const Route = createFileRoute("/api/assist")({
         const fail = (e: unknown) => {
           const err = toAiError(e);
           if (err.status !== 499) console.error("[ai:ask]", err.status ?? "", err.message);
-          return Response.json({ message: err.message, retryable: err.retryable }, { status: err.status && err.status >= 400 ? err.status : 500 });
+          return Response.json(
+            { message: err.message, retryable: err.retryable },
+            { status: err.status && err.status >= 400 ? err.status : 500 },
+          );
         };
 
         let stream: ReturnType<typeof aiStream>;
         try {
-          stream = aiStream(effort, askInstructions(effort), `${ctx}\n\nATTORNEY REQUEST:\n${question}`, {
-            ...(history ? { history } : {}),
-            ...(runId ? { runId } : {}),
-            signal: request.signal,
-          });
+          stream = aiStream(
+            effort,
+            askInstructions(effort),
+            `${ctx}\n\nATTORNEY REQUEST:\n${question}`,
+            {
+              ...(history ? { history } : {}),
+              ...(runId ? { runId } : {}),
+              signal: request.signal,
+            },
+          );
         } catch (e) {
           return fail(e);
         }
@@ -82,12 +97,16 @@ export const Route = createFileRoute("/api/assist")({
                 cur = await it.next();
               }
               const usage = await result.usage;
-              const u = { inputTokens: usage.inputTokens ?? undefined, outputTokens: usage.outputTokens ?? undefined };
+              const u = {
+                inputTokens: usage.inputTokens ?? undefined,
+                outputTokens: usage.outputTokens ?? undefined,
+              };
               await logRun(auth.supabase, auth.userId, matterId, "ask", effort, u);
               send({ t: "done", usage: u, runId: getRunId() ?? null });
             } catch (e) {
               const err = toAiError(e);
-              if (err.status !== 499) console.error("[ai:ask:stream]", err.status ?? "", err.message);
+              if (err.status !== 499)
+                console.error("[ai:ask:stream]", err.status ?? "", err.message);
               send({ t: "error", message: err.message, retryable: err.retryable });
             } finally {
               try {

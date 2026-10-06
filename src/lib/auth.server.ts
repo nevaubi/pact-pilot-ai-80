@@ -7,7 +7,9 @@ function isNewKey(v: string) {
   return v.startsWith("sb_publishable_") || v.startsWith("sb_secret_");
 }
 
-export async function authFromRequest(request: Request): Promise<{ supabase: SupabaseClient<Database>; userId: string } | null> {
+export async function authFromRequest(
+  request: Request,
+): Promise<{ supabase: SupabaseClient<Database>; userId: string } | null> {
   const url = process.env["SUPABASE_URL"];
   const key = process.env["SUPABASE_PUBLISHABLE_KEY"];
   if (!url || !key) throw new Error("Backend is not configured.");

@@ -24,10 +24,13 @@ type Mode = "in" | "up" | "forgot" | "reset";
 function friendly(msg: string) {
   const m = msg.toLowerCase();
   if (m.includes("invalid login credentials")) return "That email and password don't match.";
-  if (m.includes("email not confirmed")) return "Please confirm your email first — check your inbox for the link.";
-  if (m.includes("already registered")) return "An account with this email already exists. Sign in instead.";
+  if (m.includes("email not confirmed"))
+    return "Please confirm your email first — check your inbox for the link.";
+  if (m.includes("already registered"))
+    return "An account with this email already exists. Sign in instead.";
   if (m.includes("password should be")) return "Use at least 8 characters for the password.";
-  if (m.includes("rate limit") || m.includes("too many")) return "Too many attempts. Please wait a minute and try again.";
+  if (m.includes("rate limit") || m.includes("too many"))
+    return "Too many attempts. Please wait a minute and try again.";
   return msg;
 }
 
@@ -72,7 +75,9 @@ function AuthPage() {
         if (data.session) navigate({ to: "/today" });
         else setNotice("Check your email to confirm your account, then sign in.");
       } else if (mode === "forgot") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth` });
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
         if (error) throw error;
         setNotice("If that email has an account, a reset link is on its way.");
       } else {
@@ -88,7 +93,14 @@ function AuthPage() {
     }
   }
 
-  const title = mode === "in" ? "Sign in" : mode === "up" ? "Create account" : mode === "forgot" ? "Reset password" : "Choose a new password";
+  const title =
+    mode === "in"
+      ? "Sign in"
+      : mode === "up"
+        ? "Create account"
+        : mode === "forgot"
+          ? "Reset password"
+          : "Choose a new password";
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -103,7 +115,16 @@ function AuthPage() {
         {notice ? (
           <div className="space-y-4 text-sm">
             <p>{notice}</p>
-            <Button variant="outline" className="w-full" onClick={() => { setNotice(null); setMode("in"); }}>Back to sign in</Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setNotice(null);
+                setMode("in");
+              }}
+            >
+              Back to sign in
+            </Button>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4" aria-label={title}>
@@ -111,30 +132,75 @@ function AuthPage() {
             {mode === "up" && (
               <div className="space-y-1.5">
                 <Label htmlFor="name">Full name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  autoComplete="name"
+                />
               </div>
             )}
             {mode !== "reset" && (
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                />
               </div>
             )}
             {mode !== "forgot" && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">{mode === "reset" ? "New password" : "Password"}</Label>
-                  {mode === "in" && <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setMode("forgot")}>Forgot?</button>}
+                  {mode === "in" && (
+                    <button
+                      type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => setMode("forgot")}
+                    >
+                      Forgot?
+                    </button>
+                  )}
                 </div>
-                <Input id="password" type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete={mode === "in" ? "current-password" : "new-password"} />
+                <Input
+                  id="password"
+                  type="password"
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete={mode === "in" ? "current-password" : "new-password"}
+                />
               </div>
             )}
             <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Please wait…" : mode === "in" ? "Sign in" : mode === "up" ? "Create account" : mode === "forgot" ? "Send reset link" : "Update password"}
+              {busy
+                ? "Please wait…"
+                : mode === "in"
+                  ? "Sign in"
+                  : mode === "up"
+                    ? "Create account"
+                    : mode === "forgot"
+                      ? "Send reset link"
+                      : "Update password"}
             </Button>
             {mode !== "reset" && (
-              <button type="button" className="w-full text-center text-xs text-muted-foreground hover:text-foreground" onClick={() => setMode(mode === "in" ? "up" : "in")}>
-                {mode === "in" ? "New to Mirza? Create an account" : mode === "up" ? "Already have an account? Sign in" : "Back to sign in"}
+              <button
+                type="button"
+                className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setMode(mode === "in" ? "up" : "in")}
+              >
+                {mode === "in"
+                  ? "New to Mirza? Create an account"
+                  : mode === "up"
+                    ? "Already have an account? Sign in"
+                    : "Back to sign in"}
               </button>
             )}
           </form>

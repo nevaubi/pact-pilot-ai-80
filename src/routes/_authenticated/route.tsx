@@ -1,4 +1,11 @@
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  redirect,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { Briefcase, CalendarCheck, Users, Files, FileText, Settings, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LogoMark } from "@/components/LogoMark";
@@ -26,7 +33,9 @@ function Shell() {
   const navigate = useNavigate();
   const item = (active: boolean) =>
     `flex min-w-[44px] flex-col items-center gap-1 rounded-xl px-1.5 py-2 text-[10px] font-medium transition-colors sm:min-w-[56px] sm:px-2 ${
-      active ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
+      active
+        ? "bg-card text-primary shadow-sm"
+        : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
     }`;
   return (
     <div className="flex min-h-screen flex-col md:flex-row">

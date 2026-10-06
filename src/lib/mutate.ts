@@ -10,7 +10,10 @@ class ToastedError extends Error {
  * Await a backend write, surface failures as a toast, and throw so callers stop.
  * Every mutation in the app goes through here so no write can fail silently.
  */
-export async function mut<R extends Result>(p: PromiseLike<R>, opts: { success?: string; failure?: string } = {}): Promise<NonNullable<R["data"]>> {
+export async function mut<R extends Result>(
+  p: PromiseLike<R>,
+  opts: { success?: string; failure?: string } = {},
+): Promise<NonNullable<R["data"]>> {
   const { data, error } = await p;
   if (error) {
     toast.error(opts.failure ?? "That didn't save", { description: humanize(error.message) });
@@ -23,12 +26,17 @@ export async function mut<R extends Result>(p: PromiseLike<R>, opts: { success?:
 /** Map raw backend messages to something an attorney can act on. */
 export function humanize(message: string) {
   const m = message.toLowerCase();
-  if (m.includes("jwt") || m.includes("not authenticated") || m.includes("unauthorized")) return "Your session has expired. Please sign in again.";
-  if (m.includes("permission") || m.includes("row-level security") || m.includes("policy")) return "You don't have access to do that.";
+  if (m.includes("jwt") || m.includes("not authenticated") || m.includes("unauthorized"))
+    return "Your session has expired. Please sign in again.";
+  if (m.includes("permission") || m.includes("row-level security") || m.includes("policy"))
+    return "You don't have access to do that.";
   if (m.includes("duplicate key")) return "That already exists.";
-  if (m.includes("violates foreign key")) return "Something this depends on was removed. Refresh and try again.";
-  if (m.includes("failed to fetch") || m.includes("network")) return "Couldn't reach the server. Check your connection and try again.";
-  if (m.includes("payload too large") || m.includes("exceeded the maximum allowed size")) return "That file is too large (25 MB limit).";
+  if (m.includes("violates foreign key"))
+    return "Something this depends on was removed. Refresh and try again.";
+  if (m.includes("failed to fetch") || m.includes("network"))
+    return "Couldn't reach the server. Check your connection and try again.";
+  if (m.includes("payload too large") || m.includes("exceeded the maximum allowed size"))
+    return "That file is too large (25 MB limit).";
   return message;
 }
 

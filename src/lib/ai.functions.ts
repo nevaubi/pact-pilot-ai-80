@@ -16,7 +16,13 @@ const uuid = z.string().uuid();
 const runIdZ = z.string().max(200).optional();
 
 /** Runs an AI step, logs it to ai_runs, and converts any failure into a plain message the UI can show. */
-async function runAi<T extends { usage: Usage }>(ctx: Ctx, matterId: string, kind: string, effort: Effort, fn: () => Promise<T>): Promise<T> {
+async function runAi<T extends { usage: Usage }>(
+  ctx: Ctx,
+  matterId: string,
+  kind: string,
+  effort: Effort,
+  fn: () => Promise<T>,
+): Promise<T> {
   const { logRun, toAiError } = await import("./ai.server");
   try {
     const r = await fn();
@@ -29,29 +35,53 @@ async function runAi<T extends { usage: Usage }>(ctx: Ctx, matterId: string, kin
   }
 }
 
-const sourced = { why: z.string().describe("One sentence: the reason, plus the exact source text it came from, quoted") };
+const sourced = {
+  why: z
+    .string()
+    .describe("One sentence: the reason, plus the exact source text it came from, quoted"),
+};
 
 export const askMatter = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { matterId: string; effort: Effort; question: string; history?: { q: string; a: string }[]; runId?: string }) =>
-    z
-      .object({
-        matterId: uuid,
-        effort: effortZ,
-        question: z.string().min(1).max(4000),
-        history: z.array(z.object({ q: z.string().max(4000), a: z.string().max(20000) })).max(8).optional(),
-        runId: runIdZ,
-      })
-      .parse(d),
+  .inputValidator(
+    (d: {
+      matterId: string;
+      effort: Effort;
+      question: string;
+      history?: { q: string; a: string }[];
+      runId?: string;
+    }) =>
+      z
+        .object({
+          matterId: uuid,
+          effort: effortZ,
+          question: z.string().min(1).max(4000),
+          history: z
+            .array(z.object({ q: z.string().max(4000), a: z.string().max(20000) }))
+            .max(8)
+            .optional(),
+          runId: runIdZ,
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) =>
     runAi(context, data.matterId, "ask", data.effort, async () => {
       const { aiText, matterContext, askInstructions } = await import("./ai.server");
-      const ctx = await matterContext(context.supabase, data.matterId, data.effort, data.effort === "advanced");
-      const r = await aiText(data.effort, askInstructions(data.effort), `${ctx}\n\nATTORNEY REQUEST:\n${data.question}`, {
-        ...(data.history ? { history: data.history } : {}),
-        ...(data.runId ? { runId: data.runId } : {}),
-      });
+      const ctx = await matterContext(
+        context.supabase,
+        data.matterId,
+        data.effort,
+        data.effort === "advanced",
+      );
+      const r = await aiText(
+        data.effort,
+        askInstructions(data.effort),
+        `${ctx}\n\nATTORNEY REQUEST:\n${data.question}`,
+        {
+          ...(data.history ? { history: data.history } : {}),
+          ...(data.runId ? { runId: data.runId } : {}),
+        },
+      );
       return { text: r.text, usage: r.usage, runId: r.runId };
     }),
   );
@@ -59,26 +89,57 @@ export const askMatter = createServerFn({ method: "POST" })
 export const mapDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { matterId: string; effort: Effort; fileName: string; text: string }) =>
-    z.object({ matterId: uuid, effort: effortZ, fileName: z.string().max(300), text: z.string().min(20).max(400000) }).parse(d),
+    z
+      .object({
+        matterId: uuid,
+        effort: effortZ,
+        fileName: z.string().max(300),
+        text: z.string().min(20).max(400000),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) =>
     runAi(context, data.matterId, "intake", data.effort, async () => {
       const { aiObject, matterContext } = await import("./ai.server");
       const ctx = await matterContext(context.supabase, data.matterId, data.effort);
       const schema = z.object({
-        summary: z.string().describe("Two or three plain sentences on what this document is and where the deal stands"),
-        document_type: z.string().describe("e.g. Letter of Intent, Purchase Agreement, Lease, Questionnaire"),
+        summary: z
+          .string()
+          .describe(
+            "Two or three plain sentences on what this document is and where the deal stands",
+          ),
+        document_type: z
+          .string()
+          .describe("e.g. Letter of Intent, Purchase Agreement, Lease, Questionnaire"),
         parties: z.array(z.object({ name: z.string(), role: z.string(), ...sourced })),
         deadlines: z.array(
           z.object({
             title: z.string(),
-            due_on: z.string().describe("YYYY-MM-DD. Compute from the document when stated relative to a date in it; otherwise 'unknown'"),
+            due_on: z
+              .string()
+              .describe(
+                "YYYY-MM-DD. Compute from the document when stated relative to a date in it; otherwise 'unknown'",
+              ),
             kind: z.string().describe("Contract, Closing, Filing, Internal, or Client"),
             ...sourced,
           }),
         ),
-        tasks: z.array(z.object({ title: z.string(), assignee: z.string().describe("Attorney, Associate, Staff, Client, or Other party"), ...sourced })),
-        deliverables: z.array(z.object({ deliverable: z.string(), responsible: z.string().describe("Buyer, Seller, Lender, Title, Escrow, Firm, or a named party"), ...sourced })),
+        tasks: z.array(
+          z.object({
+            title: z.string(),
+            assignee: z.string().describe("Attorney, Associate, Staff, Client, or Other party"),
+            ...sourced,
+          }),
+        ),
+        deliverables: z.array(
+          z.object({
+            deliverable: z.string(),
+            responsible: z
+              .string()
+              .describe("Buyer, Seller, Lender, Title, Escrow, Firm, or a named party"),
+            ...sourced,
+          }),
+        ),
       });
       const cap = data.effort === "advanced" ? 100_000 : 40_000;
       const text = data.text.slice(0, cap);
@@ -88,7 +149,12 @@ export const mapDocument = createServerFn({ method: "POST" })
         `${ctx}\n\nDOCUMENT "${data.fileName}"${text.length < data.text.length ? " (truncated)" : ""}:\n${text}`,
         schema,
       );
-      return { ...r.output, usage: r.usage, runId: r.runId, truncated: text.length < data.text.length };
+      return {
+        ...r.output,
+        usage: r.usage,
+        runId: r.runId,
+        truncated: text.length < data.text.length,
+      };
     }),
   );
 
@@ -102,9 +168,21 @@ export const processMeetingNotes = createServerFn({ method: "POST" })
       const { aiObject, matterContext } = await import("./ai.server");
       const ctx = await matterContext(context.supabase, data.matterId, data.effort);
       const schema = z.object({
-        title: z.string().describe("Short memo title, e.g. 'Call with seller's counsel — closing timing'"),
-        summary: z.string().describe("Clean meeting memo in markdown: attendees if known, discussion, decisions, open questions"),
-        tasks: z.array(z.object({ title: z.string(), assignee: z.string().describe("Attorney, Associate, Staff, Client, or Other party"), ...sourced })),
+        title: z
+          .string()
+          .describe("Short memo title, e.g. 'Call with seller's counsel — closing timing'"),
+        summary: z
+          .string()
+          .describe(
+            "Clean meeting memo in markdown: attendees if known, discussion, decisions, open questions",
+          ),
+        tasks: z.array(
+          z.object({
+            title: z.string(),
+            assignee: z.string().describe("Attorney, Associate, Staff, Client, or Other party"),
+            ...sourced,
+          }),
+        ),
       });
       const r = await aiObject(
         data.effort,
@@ -118,13 +196,23 @@ export const processMeetingNotes = createServerFn({ method: "POST" })
 
 export const draftClosingChecklist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { matterId: string; effort: Effort }) => z.object({ matterId: uuid, effort: effortZ }).parse(d))
+  .inputValidator((d: { matterId: string; effort: Effort }) =>
+    z.object({ matterId: uuid, effort: effortZ }).parse(d),
+  )
   .handler(async ({ data, context }) =>
     runAi(context, data.matterId, "closing", data.effort, async () => {
       const { aiObject, matterContext } = await import("./ai.server");
       const ctx = await matterContext(context.supabase, data.matterId, data.effort, true);
       const schema = z.object({
-        items: z.array(z.object({ deliverable: z.string(), responsible: z.string().describe("Buyer, Seller, Lender, Title, Escrow, Firm, or a named party"), ...sourced })),
+        items: z.array(
+          z.object({
+            deliverable: z.string(),
+            responsible: z
+              .string()
+              .describe("Buyer, Seller, Lender, Title, Escrow, Firm, or a named party"),
+            ...sourced,
+          }),
+        ),
       });
       const r = await aiObject(
         data.effort,
@@ -139,14 +227,22 @@ export const draftClosingChecklist = createServerFn({ method: "POST" })
 export const suggestTemplateAnswers = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { matterId: string; effort: Effort; fields: string[] }) =>
-    z.object({ matterId: uuid, effort: effortZ, fields: z.array(z.string().max(200)).max(80) }).parse(d),
+    z
+      .object({ matterId: uuid, effort: effortZ, fields: z.array(z.string().max(200)).max(80) })
+      .parse(d),
   )
   .handler(async ({ data, context }) =>
     runAi(context, data.matterId, "draft_fill", data.effort, async () => {
       const { aiObject, matterContext } = await import("./ai.server");
       const ctx = await matterContext(context.supabase, data.matterId, data.effort, true);
       const schema = z.object({
-        answers: z.array(z.object({ field: z.string().describe("The blank's name exactly as given"), value: z.string().describe("Empty string if the matter does not say"), ...sourced })),
+        answers: z.array(
+          z.object({
+            field: z.string().describe("The blank's name exactly as given"),
+            value: z.string().describe("Empty string if the matter does not say"),
+            ...sourced,
+          }),
+        ),
       });
       const r = await aiObject(
         data.effort,
@@ -161,7 +257,14 @@ export const suggestTemplateAnswers = createServerFn({ method: "POST" })
 export const suggestDraftEdits = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { matterId: string; effort: Effort; body: string; instruction: string }) =>
-    z.object({ matterId: uuid, effort: effortZ, body: z.string().min(10).max(100000), instruction: z.string().max(2000) }).parse(d),
+    z
+      .object({
+        matterId: uuid,
+        effort: effortZ,
+        body: z.string().min(10).max(100000),
+        instruction: z.string().max(2000),
+      })
+      .parse(d),
   )
   .handler(async ({ data, context }) =>
     runAi(context, data.matterId, "draft_edit", data.effort, async () => {
@@ -170,9 +273,15 @@ export const suggestDraftEdits = createServerFn({ method: "POST" })
       const schema = z.object({
         edits: z.array(
           z.object({
-            original: z.string().describe("Exact verbatim text copied from the draft (a phrase or sentence), to be replaced"),
+            original: z
+              .string()
+              .describe(
+                "Exact verbatim text copied from the draft (a phrase or sentence), to be replaced",
+              ),
             suggested: z.string().describe("The replacement text"),
-            reason: z.string().describe("Why, citing the matter fact or instruction that calls for it"),
+            reason: z
+              .string()
+              .describe("Why, citing the matter fact or instruction that calls for it"),
           }),
         ),
       });

@@ -81,9 +81,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Mirza — Matter management for boutique law firms" },
-      { name: "description", content: "Matters, deadlines, closings and house-template drafting with on-request AI support." },
+      {
+        name: "description",
+        content:
+          "Matters, deadlines, closings and house-template drafting with on-request AI support.",
+      },
       { property: "og:title", content: "Mirza" },
-      { property: "og:description", content: "Matter management for boutique transactional law firms." },
+      {
+        property: "og:description",
+        content: "Matter management for boutique transactional law firms.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -123,7 +130,8 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
   useEffect(() => {
-    if (localStorage.getItem("mirza-theme") === "dark") document.documentElement.classList.add("dark");
+    if (localStorage.getItem("mirza-theme") === "dark")
+      document.documentElement.classList.add("dark");
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       router.invalidate();
