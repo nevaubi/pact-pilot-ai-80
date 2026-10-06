@@ -9,20 +9,20 @@ Priority order: (a) broken → (b) core non-AI flows → (c) AI desk → (d) pol
 - [x] Office: Word (.docx) editor with high-fidelity rendering and tracked suggestions, PDF viewer/annotator, spreadsheet editor; AI drafting side panel connected to the matter's files, pinned sources, house templates and the open document
 - [ ] Compliance calendar generator (entity annual reports, UCC continuations) with authority links
 
-## Office pass 2 (review findings + fidelity/save) — in progress
-- [ ] P0-1 tools bounds (readCells sparse, A1 strict, 1e999, formula case, Unicode offsets, overlong query)
-- [ ] P0-2 Word adapter: typed SuperDoc, strict receipts, atomic mutations plan, live revalidation, partial state
-- [ ] P0-3 Sheet apply: exact snapshot/restore, verified rollback, FORCE_STRING text, pinned legacy sheet
-- [ ] P0-4 use-assist ownership, abort-before-fetch, empty/exhausted done, line cap, retry snapshot
-- [ ] P0-5 DraftPanel sync locks, attach preflight, privacy wording, stable callbacks, panel width
-- [ ] P0-6 server bounds (body bytes, aggregates, budget JSON, abort propagation, maxOutputTokens, retry, synthesis)
-- [ ] P0-7 public sources status per provider + fetch_public_source allowlist
-- [ ] 8 formatting proposals (Word inline, sheet number format/bold/fill/align)
-- [ ] 9 exact original-blob no-op export, Save disabled when unchanged
-- [ ] 10 XLSX package patcher preserving untouched ZIP entries
-- [ ] 11 conflict-safe save RPC + migration
-- [ ] 12 Office route lifecycle (save lock, revisions, stale results)
-- [ ] Browser harness + docs/office-ai-verification.md
+## Office pass 2 (review findings + fidelity/save) — done (not deployed)
+- [x] P0-1 tools bounds (readCells sparse, A1 strict, 1e999, formula case, Unicode offsets, overlong query)
+- [x] P0-2 Word adapter: typed SuperDoc, strict receipts, atomic mutations plan, live revalidation, partial state
+- [x] P0-3 Sheet apply: exact snapshot/restore, verified rollback, FORCE_STRING text, pinned legacy sheet
+- [x] P0-4 use-assist ownership, abort-before-fetch, empty/exhausted done, line cap, retry snapshot
+- [x] P0-5 DraftPanel sync locks, attach preflight, privacy wording, stable callbacks, panel width
+- [x] P0-6 server bounds (body bytes, aggregates, budget JSON, abort propagation, maxOutputTokens, retry, synthesis)
+- [x] P0-7 public sources status per provider + fetch_public_source allowlist
+- [x] 8 formatting proposals (Word inline, sheet number format/bold/fill/align)
+- [x] 9 exact original-blob no-op export, Save disabled when unchanged
+- [x] 10 XLSX package patcher preserving untouched ZIP entries
+- [x] 11 conflict-safe save RPC + migration
+- [x] 12 Office route lifecycle (save lock, revisions, stale results)
+- [x] Browser harness + docs/office-ai-verification.md
 
 ## Ready (next pass)
 - [ ] Office: "Open in editor" from Templates and Drafts (convert a generated draft to .docx and open it)
