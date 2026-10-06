@@ -8,6 +8,7 @@ import { EffortToggle, UsageNote, ReviewBanner } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { copyText } from "@/lib/clipboard";
+import { splitDraft } from "@/lib/office-proposals";
 import type { EditorHandle } from "./DocxEditor";
 
 type Props = {
@@ -82,20 +83,6 @@ const QUICK: Record<
     },
   ],
 };
-
-/** Split an answer into the explanation and the proposed text inside the ```draft fence, if present. */
-export function splitDraft(answer: string): { proposal: string | null; explanation: string } {
-  const re = /```draft[^\n]*\n([\s\S]*?)```/g;
-  const blocks: string[] = [];
-  const explanation = answer
-    .replace(re, (_all, body: string) => {
-      blocks.push(body.replace(/\s+$/, ""));
-      return "";
-    })
-    .trim();
-  if (!blocks.length) return { proposal: null, explanation: answer };
-  return { proposal: blocks.join("\n\n"), explanation };
-}
 
 /** Drafting side panel: streams draft-mode answers grounded in the open document, matter files and pinned sources. */
 export function DraftPanel({ matterId, fileId, kind, canInsert, getDoc, editor }: Props) {

@@ -3,6 +3,7 @@ import type { EditorHandle } from "./DocxEditor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { workbookDataText, workbookToXlsx, xlsxToWorkbook, type WorkbookData } from "@/lib/office";
 import { logClientError } from "@/lib/error-log";
+import { coerceCellValue, parseCellAssignments } from "@/lib/office-proposals";
 
 type Props = {
   blob: Blob;
@@ -39,42 +40,6 @@ type Api = {
   onCommandExecuted?: (cb: (c: { id: string; type?: number }) => void) => { dispose: () => void };
   dispose?: () => void;
 };
-
-/** One `B12 = =SUM(B2:B11)` / `Deadlines!C4 = 2026-03-31` line from a proposal. */
-export type CellAssignment = { sheet?: string; cell: string; value: string };
-
-const CELL_LINE =
-  /^\s*(?:[-*]\s*)?(?:`)?(?:(?:'([^']+)'|"([^"]+)"|([A-Za-z0-9_ ]+?))!)?\$?([A-Za-z]{1,3})\$?(\d{1,7})(?:`)?\s*(?::|=|→|->)\s*(.+?)\s*$/;
-
-/** Parse proposal lines into cell assignments; lines that aren't assignments are ignored. */
-export function parseCellAssignments(text: string): CellAssignment[] {
-  const out: CellAssignment[] = [];
-  for (const raw of text.split(/\r?\n/)) {
-    const m = CELL_LINE.exec(raw);
-    if (!m) continue;
-    const [, q1, q2, bare, col = "", row = "", rhs = ""] = m;
-    if (!col || !row) continue;
-    let value = rhs.trim();
-    // Strip inline-code ticks and a trailing explanation after " — " or " // ".
-    value = value
-      .replace(/^`([^`]*)`.*$/, "$1")
-      .replace(/\s+(?:—|–|\/\/|#)\s.*$/, "")
-      .trim();
-    if (/^".*"$/.test(value) || /^'.*'$/.test(value)) value = value.slice(1, -1);
-    const sheet = (q1 ?? q2 ?? bare)?.trim();
-    out.push({ ...(sheet ? { sheet } : {}), cell: `${col.toUpperCase()}${row}`, value });
-  }
-  return out;
-}
-
-function coerce(v: string): string | number | boolean | null {
-  if (v === "" || /^(blank|empty|null)$/i.test(v)) return null;
-  if (/^(true|false)$/i.test(v)) return v.toLowerCase() === "true";
-  const n = v.replace(/^\$/, "").replace(/,/g, "");
-  if (/^-?\d+(\.\d+)?$/.test(n)) return Number(n);
-  if (/^-?\d+(\.\d+)?%$/.test(n)) return Number(n.slice(0, -1)) / 100;
-  return v;
-}
 
 /** Spreadsheet editor on Univer (formulas, formatting, freeze, merges). Round-trips .xlsx through ExcelJS. */
 export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: Props) {
@@ -190,7 +155,7 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
               continue;
             }
             const range = sheet.getRange(a.cell);
-            const value = a.value.startsWith("=") ? a.value : coerce(a.value);
+            const value = a.value.startsWith("=") ? a.value : coerceCellValue(a.value);
             // A new number in a blank cell inherits the format of the cell above (currency, dates), like a filled-down column.
             const wasBlank = range.isBlank?.() ?? false;
             if (a.value.startsWith("=")) range.setFormula(a.value);
