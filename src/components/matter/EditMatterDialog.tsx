@@ -53,10 +53,12 @@ export function EditMatterDialog({ matter, open, onOpenChange }: { matter: M; op
       const { data: files } = await supabase.from("files").select("path").eq("matter_id", matter.id);
       if (files?.length) await supabase.storage.from("matter-files").remove(files.map((x) => x.path));
       await mut(supabase.from("matters").delete().eq("id", matter.id).select("id"), { success: "Matter deleted" });
-      qc.removeQueries({ queryKey: ["matter", matter.id] });
-      qc.invalidateQueries();
       onOpenChange(false);
-      navigate({ to: "/matters" });
+      await navigate({ to: "/matters" });
+      // Drop this matter's cached queries, then refresh the lists that referenced it.
+      qc.removeQueries({ queryKey: ["matter", matter.id] });
+      qc.removeQueries({ predicate: (query) => query.queryKey[1] === matter.id });
+      ["matters", "today-deadlines", "today-tasks", "today-activity", "files-hub", "contact-matters", "ai-usage"].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
     }, "Couldn't delete the matter");
   }
 
