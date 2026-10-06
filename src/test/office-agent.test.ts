@@ -116,12 +116,12 @@ describe("office tool loop", () => {
   });
 
   it("is bounded: a model that keeps calling tools stops at 4 rounds on Normal", async () => {
-    const many = Array.from({ length: 12 }, () => toolStep([{ name: "get_outline", input: {} }]));
-    const model = new MockLanguageModelV4({ doStream: many as never });
+    const many = () => Array.from({ length: 12 }, () => toolStep([{ name: "get_outline", input: {} }]));
+    const model = new MockLanguageModelV4({ doStream: many() as never });
     const { result } = setup(model, "normal");
     for await (const _ of result.fullStream) void _;
     expect(model.doStreamCalls.length).toBe(4);
-    const model2 = new MockLanguageModelV4({ doStream: many as never });
+    const model2 = new MockLanguageModelV4({ doStream: many() as never });
     const r2 = setup(model2, "advanced").result;
     for await (const _ of r2.fullStream) void _;
     expect(model2.doStreamCalls.length).toBe(8);
