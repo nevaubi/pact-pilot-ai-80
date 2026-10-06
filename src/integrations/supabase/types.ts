@@ -262,6 +262,42 @@ export type Database = {
           },
         ]
       }
+      client_errors: {
+        Row: {
+          context: Json
+          created_at: string
+          id: string
+          message: string
+          route: string
+          source: string
+          stack: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          context?: Json
+          created_at?: string
+          id?: string
+          message: string
+          route: string
+          source: string
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Update: {
+          context?: Json
+          created_at?: string
+          id?: string
+          message?: string
+          route?: string
+          source?: string
+          stack?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       closing_items: {
         Row: {
           created_at: string

@@ -43,6 +43,13 @@
       "when": 1791301525370,
       "tag": "0005_matter_files_update_policy",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791303297505,
+      "tag": "0006_client_error_log",
+      "breakpoints": true
     }
   ]
 }
