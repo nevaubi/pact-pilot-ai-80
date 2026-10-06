@@ -15,22 +15,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-const KINDS: { kind: BlankKind; label: string; letter: string; tone: string; hint: string; def: string }[] = [
-  { kind: "docx", label: "Word document", letter: "W", tone: "bg-ink-blue", hint: "Blank .docx with tracked changes and the drafting assistant", def: "Untitled document" },
-  { kind: "xlsx", label: "Excel workbook", letter: "X", tone: "bg-ink-green", hint: "Blank .xlsx with one sheet", def: "Untitled workbook" },
-  { kind: "pdf", label: "PDF", letter: "PDF", tone: "bg-destructive", hint: "One blank Letter page for highlights and comments — use Word to write text", def: "Untitled PDF" },
-];
+import { FileTypeIcon } from "@/components/FileTypeIcon";
 
-function FileIcon({ letter, tone }: { letter: string; tone: string }) {
-  return (
-    <span
-      className={`flex h-8 w-7 shrink-0 items-center justify-center rounded-sm ${tone} text-[10px] font-bold tracking-tight text-primary-foreground`}
-      aria-hidden
-    >
-      {letter}
-    </span>
-  );
-}
+const KINDS: { kind: BlankKind; label: string; hint: string; def: string }[] = [
+  { kind: "docx", label: "Word document", hint: "Blank .docx with tracked changes and the drafting assistant", def: "Untitled document" },
+  { kind: "xlsx", label: "Excel workbook", hint: "Blank .xlsx with one sheet", def: "Untitled workbook" },
+  { kind: "pdf", label: "PDF", hint: "One blank Letter page for highlights and comments — use Word to write text", def: "Untitled PDF" },
+];
 
 export function NewDocumentStrip({ matterId }: { matterId?: string }) {
   const [kind, setKind] = useState<BlankKind | null>(null);
