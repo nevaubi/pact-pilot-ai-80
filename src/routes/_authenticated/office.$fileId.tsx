@@ -45,7 +45,7 @@ function OfficeError({ error, reset }: ErrorComponentProps) {
       <p className="mt-1 text-muted-foreground">
         The document itself is safe — your last saved version is unchanged. This has been added to the error log under Settings.
       </p>
-      <p className="mt-2 rounded border bg-raised px-2 py-1 font-mono text-xs text-muted-foreground">{error.message}</p>
+      <p className="mt-2 rounded border bg-raised px-2 py-1 font-mono text-xs text-muted-foreground">{error instanceof Error ? error.message : String(error)}</p>
       <div className="mt-4 flex gap-2">
         <Button
           size="sm"
