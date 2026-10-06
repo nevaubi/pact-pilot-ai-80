@@ -79,8 +79,8 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           onEditorUpdate: () => {
             if (!disposed && readyRef.current) onDirty();
           },
-          onException: (p: { error?: unknown } & Record<string, unknown>) => {
-            const e = p?.error;
+          onException: (p: unknown) => {
+            const e = (p as { error?: unknown } | undefined)?.error;
             const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "The document editor reported a problem.";
             console.error("[office:docx]", p);
             onError?.(msg);
@@ -89,7 +89,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
             if (disposed) return;
             setFailed("This document couldn't be opened in the editor. It may be damaged or use a feature the editor doesn't support yet. You can still download it.");
           },
-        } as ConstructorParameters<typeof SuperDoc>[0]);
+        } as unknown as ConstructorParameters<typeof SuperDoc>[0]);
         sdRef.current = instance;
       } catch (e) {
         console.error("[office:docx:init]", e);
@@ -180,13 +180,13 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
       acceptAllChanges: async () => {
         const d = doc();
         if (!d) return;
-        await d.trackChanges.acceptAll({} as never);
+        await d.trackChanges.decide({ decision: "accept", target: { kind: "all" } } as never);
         onDirty();
       },
       rejectAllChanges: async () => {
         const d = doc();
         if (!d) return;
-        await d.trackChanges.rejectAll({} as never);
+        await d.trackChanges.decide({ decision: "reject", target: { kind: "all" } } as never);
         onDirty();
       },
       focus: () => sdRef.current?.focus(),
