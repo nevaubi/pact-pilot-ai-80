@@ -1,13 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { ChevronLeft, Pencil, Sparkle } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { ChevronLeft, Download, Pencil, Sparkle } from "lucide-react";
 import { matterQ, tableQ, matterContactsQ } from "@/lib/data";
 import { PracticeChip, StatusDot, LoadError } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Overview } from "@/components/matter/Overview";
 import {
   TasksTab,
   DeadlinesTab,
@@ -15,11 +14,13 @@ import {
   ContactsTab,
   ActivityTab,
 } from "@/components/matter/Lists";
-import { FilesTab } from "@/components/matter/FilesTab";
-import { ClosingTab } from "@/components/matter/ClosingTab";
-import { DraftsTab } from "@/components/matter/DraftsTab";
-import { AssistPanel } from "@/components/matter/AssistPanel";
 import { EditMatterDialog } from "@/components/matter/EditMatterDialog";
+
+const Overview = lazy(() => import("@/components/matter/Overview").then((m) => ({ default: m.Overview })));
+const FilesTab = lazy(() => import("@/components/matter/FilesTab").then((m) => ({ default: m.FilesTab })));
+const ClosingTab = lazy(() => import("@/components/matter/ClosingTab").then((m) => ({ default: m.ClosingTab })));
+const DraftsTab = lazy(() => import("@/components/matter/DraftsTab").then((m) => ({ default: m.DraftsTab })));
+const AssistPanel = lazy(() => import("@/components/matter/AssistPanel").then((m) => ({ default: m.AssistPanel })));
 
 const TABS = [
   "Overview",
@@ -67,16 +68,40 @@ function MatterPage() {
   const q = useQuery(matterQ(id));
   const m = q.data;
   const [assist, setAssist] = useState(false);
+  const [assistPrompt, setAssistPrompt] = useState<string | undefined>();
   const [edit, setEdit] = useState(false);
 
-  // Warm every tab's list once so switching tabs is instant.
+  // Warm only the active tab; intent preloading handles the rest of navigation.
   useEffect(() => {
     if (!m) return;
-    (
-      ["tasks", "deadlines", "notes", "files", "drafts", "closing_items", "activity"] as const
-    ).forEach((t) => qc.prefetchQuery(tableQ(t, id)));
-    qc.prefetchQuery(matterContactsQ(id));
-  }, [m, id, qc]);
+    const tables = { Tasks: "tasks", Deadlines: "deadlines", Notes: "notes", Files: "files", Drafts: "drafts", Closing: "closing_items", Activity: "activity" } as const;
+    const table = tables[tab as keyof typeof tables];
+    if (table) qc.prefetchQuery(tableQ(table, id));
+    if (tab === "Contacts") qc.prefetchQuery(matterContactsQ(id));
+    if (tab === "Overview") {
+      qc.prefetchQuery(tableQ("tasks", id));
+      qc.prefetchQuery(tableQ("deadlines", id));
+      qc.prefetchQuery(tableQ("closing_items", id));
+    }
+  }, [m, id, qc, tab]);
+
+  async function exportSummary() {
+    if (!m) return;
+    const [tasks, deadlines, closing] = await Promise.all([
+      qc.ensureQueryData(tableQ("tasks", id)),
+      qc.ensureQueryData(tableQ("deadlines", id)),
+      qc.ensureQueryData(tableQ("closing_items", id)),
+    ]);
+    const esc = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    const list = (title: string, rows: string[]) => `<h2>${title}</h2>${rows.length ? `<ul>${rows.map((row) => `<li>${esc(row)}</li>`).join("")}</ul>` : "<p>None.</p>"}`;
+    const html = `<html><head><meta charset="utf-8"><title>${esc(m.title)}</title></head><body><h1>${esc(m.title)}</h1><p>${esc([m.number, m.client, m.status].filter(Boolean).join(" · "))}</p>${m.summary ? `<p>${esc(m.summary)}</p>` : ""}${list("Open tasks", tasks.filter((x) => !x.done).map((x) => `${x.title}${x.assignee ? ` — ${x.assignee}` : ""}${x.due_on ? ` — due ${x.due_on}` : ""}`))}${list("Deadlines", deadlines.map((x) => `${x.due_on} — ${x.title}`))}${list("Closing checklist", closing.map((x) => `${x.status} — ${x.deliverable}${x.responsible ? ` — ${x.responsible}` : ""}`))}</body></html>`;
+    const url = URL.createObjectURL(new Blob([html], { type: "application/msword" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${m.number ?? "matter"}-summary.doc`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const setTab = (t: string) =>
     navigate({ search: t === "Overview" ? {} : { tab: t as Tab }, replace: true });
@@ -87,7 +112,7 @@ function MatterPage() {
         <Skeleton className="h-4 w-20" />
         <Skeleton className="h-8 w-2/3" />
         <Skeleton className="h-4 w-1/3" />
-        <Skeleton className="mt-6 h-40 w-full rounded-xl" />
+        <Skeleton className="mt-6 h-40 w-full rounded" />
       </div>
     );
   }
@@ -112,8 +137,8 @@ function MatterPage() {
   }
 
   return (
-    <div className="pb-10">
-      <div className="border-b bg-card/60 px-4 pb-0 pt-4 md:px-8">
+    <div className="pb-8">
+      <div className="border-b bg-card px-4 pb-0 pt-3 md:px-6">
         <Link
           to="/matters"
           className="mb-2 inline-flex items-center text-xs text-muted-foreground hover:text-foreground"
@@ -129,10 +154,18 @@ function MatterPage() {
               )}
               <StatusDot status={m.status} />
             </div>
-            <h1 className="text-2xl font-semibold leading-tight">{m.title}</h1>
+            <h1 className="text-xl font-semibold leading-tight">{m.title}</h1>
             {m.client && <p className="text-sm text-muted-foreground">{m.client}</p>}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-1.5">
+            <Button variant="outline" onClick={exportSummary} aria-label="Export matter summary">
+              <Download className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Export</span>
+            </Button>
+            <Button variant="outline" onClick={() => { setAssistPrompt("Catch me up on this matter. Summarize the current status, immediate priorities, upcoming deadlines, open questions, and the next actions for the responsible attorney."); setAssist(true); }}>
+              <Sparkle className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Catch me up</span>
+            </Button>
             <Button variant="outline" onClick={() => setEdit(true)} aria-label="Edit matter">
               <Pencil className="h-4 w-4 sm:mr-1.5" />
               <span className="hidden sm:inline">Edit</span>
@@ -145,13 +178,13 @@ function MatterPage() {
             </Button>
           </div>
         </div>
-        <Tabs value={tab} onValueChange={setTab} className="mt-3">
+        <Tabs value={tab} onValueChange={setTab} className="mt-2">
           <TabsList className="h-auto w-full flex-nowrap justify-start gap-1 overflow-x-auto bg-transparent p-0 [scrollbar-width:none] sm:flex-wrap">
             {TABS.map((t) => (
               <TabsTrigger
                 key={t}
                 value={t}
-                className="shrink-0 rounded-b-none rounded-t-lg border-b-2 border-transparent px-3 py-2 data-[state=active]:border-primary data-[state=active]:bg-card data-[state=active]:shadow-none"
+                className="shrink-0 rounded-none border-b-2 border-transparent px-2.5 py-2 data-[state=active]:border-primary data-[state=active]:bg-transparent"
               >
                 {t}
               </TabsTrigger>
@@ -159,10 +192,10 @@ function MatterPage() {
           </TabsList>
         </Tabs>
       </div>
-      <div className="px-4 pt-5 md:px-8">
+      <div className="p-4 md:p-6">
         <Tabs value={tab}>
           <TabsContent value="Overview">
-            <Overview matter={m} onTab={setTab} onEdit={() => setEdit(true)} />
+            <Suspense fallback={<TabLoading />}><Overview matter={m} onTab={setTab} onEdit={() => setEdit(true)} /></Suspense>
           </TabsContent>
           <TabsContent value="Tasks">
             <TasksTab matterId={id} />
@@ -171,13 +204,13 @@ function MatterPage() {
             <DeadlinesTab matterId={id} />
           </TabsContent>
           <TabsContent value="Closing">
-            <ClosingTab matterId={id} />
+            <Suspense fallback={<TabLoading />}><ClosingTab matterId={id} /></Suspense>
           </TabsContent>
           <TabsContent value="Files">
-            <FilesTab matterId={id} />
+            <Suspense fallback={<TabLoading />}><FilesTab matterId={id} /></Suspense>
           </TabsContent>
           <TabsContent value="Drafts">
-            <DraftsTab matter={m} />
+            <Suspense fallback={<TabLoading />}><DraftsTab matter={m} /></Suspense>
           </TabsContent>
           <TabsContent value="Notes">
             <NotesTab matterId={id} />
@@ -190,8 +223,12 @@ function MatterPage() {
           </TabsContent>
         </Tabs>
       </div>
-      <AssistPanel matter={m} open={assist} onOpenChange={setAssist} />
+      {assist && <Suspense fallback={null}><AssistPanel matter={m} open={assist} onOpenChange={setAssist} initialPrompt={assistPrompt} /></Suspense>}
       <EditMatterDialog matter={m} open={edit} onOpenChange={setEdit} />
     </div>
   );
+}
+
+function TabLoading() {
+  return <Skeleton className="h-48 w-full rounded" />;
 }

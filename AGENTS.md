@@ -20,4 +20,5 @@
 - AI never writes data directly; it returns suggestions the user ticks/accepts in the UI; why: product principle "support, not primary".
 - Drafts always derive from firm-uploaded house templates with `[[Field]]`/`{{Field}}` blanks filled deterministically; AI may only fill blanks or propose verbatim-anchored redlines; why: attorneys want consistent forms.
 - Document text is extracted in the browser (`src/lib/extract.ts`) and stored on `files.extracted_text`; why: Worker runtime can't run pdf/docx parsers.
+- Heavy matter tools load on demand and matter tabs prefetch only their active data; why: routine navigation should not download OCR/AI/editor code or fetch unused tabs.
 - All firm data is shared to any signed-in user (RLS `to authenticated using (true)`); why: phase 1 has no roles.

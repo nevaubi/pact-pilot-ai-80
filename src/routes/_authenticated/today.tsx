@@ -19,6 +19,11 @@ export const Route = createFileRoute("/_authenticated/today")({
     ],
   }),
   component: Today,
+  loader: ({ context }) => Promise.all([
+    context.queryClient.ensureQueryData({ queryKey: ["today-deadlines"], queryFn: () => q(supabase.from("deadlines").select("*, matters!inner(id,title,status)").neq("matters.status", "Closed").gte("due_on", new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10)).lte("due_on", new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10)).order("due_on").limit(15)) }),
+    context.queryClient.ensureQueryData({ queryKey: ["today-tasks"], queryFn: () => q(supabase.from("tasks").select("*, matters!inner(id,title,status)").eq("done", false).neq("matters.status", "Closed").order("due_on", { nullsFirst: false }).limit(20)) }),
+    context.queryClient.ensureQueryData({ queryKey: ["today-activity"], queryFn: () => q(supabase.from("activity").select("*, matters(id,title)").order("created_at", { ascending: false }).limit(15)) }),
+  ]),
 });
 
 async function q<T>(
@@ -40,6 +45,7 @@ function Today() {
           .select("*, matters!inner(id,title,status)")
           .neq("matters.status", "Closed")
           .gte("due_on", new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10))
+          .lte("due_on", new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10))
           .order("due_on")
           .limit(15),
       ),
@@ -88,19 +94,19 @@ function Today() {
   });
 
   return (
-    <div className="pb-10">
+    <div className="pb-8">
       <PageHeader title="Today" subtitle={today} />
-      <div className="grid gap-4 px-4 md:px-8 lg:grid-cols-3">
+      <div className="grid gap-5 p-4 md:p-6 lg:grid-cols-3">
         <Panel title="Deadlines" className="lg:col-span-1">
           <ListState query={deadlines} empty="No upcoming deadlines on open matters.">
             {(rows) => (
-              <ul className="space-y-2">
+              <ul className="divide-y">
                 {rows.map((d) => {
                   const { label, tone } = dueLabel(d.due_on);
                   return (
                     <li
                       key={d.id}
-                      className="flex items-start justify-between gap-2 rounded-lg bg-raised px-3 py-2"
+                      className="flex items-start justify-between gap-3 px-1 py-2.5 transition-colors hover:bg-raised/70"
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{d.title}</p>
@@ -176,9 +182,9 @@ function Today() {
             empty="Nothing yet. Activity across all matters shows up here."
           >
             {(rows) => (
-              <ul className="space-y-2.5">
+              <ul className="divide-y">
                 {rows.map((a) => (
-                  <li key={a.id} className="text-sm">
+                  <li key={a.id} className="py-2.5 text-sm first:pt-0 last:pb-0">
                     <span className="font-medium">{a.actor}</span>{" "}
                     <span className="text-muted-foreground">{a.message}</span>
                     <span className="block text-xs text-muted-foreground">

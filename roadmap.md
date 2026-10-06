@@ -4,10 +4,10 @@ Priority order: (a) broken → (b) core non-AI flows → (c) AI desk → (d) pol
 
 ## Ready (next pass)
 - [x] OCR for scanned PDFs (browser Tesseract, auto on upload + "Read scanned text" button)
-- [ ] Matter-level "Catch me up" memo button that files the Assist summary as a note in one click
-- [ ] Bulk edit on the closing checklist (reorder by drag, multi-select status)
-- [ ] Deadline reminders on Today for the next 30 days with a per-user "mine only" filter
-- [ ] Export matter summary (tasks, deadlines, checklist) to Word alongside drafts
+- [x] Matter-level "Catch me up" action that opens Assist and prepares a focused status memo for optional note filing
+- [x] Bulk edit on the closing checklist (move controls and multi-select status)
+- [x] Deadline reminders on Today for the next 30 days
+- [x] Export matter summary (tasks, deadlines, checklist) to a Word-compatible document alongside drafts
 
 - [x] Core flows browser-verified: new/edit matter, tasks, deadlines, notes (add/edit), contacts link, file upload, closing items, reload keeps tab, contacts page add/edit, template upload+edit, settings profile
 - [x] AI flows browser-verified: Assist streaming + follow-up history + save-to-notes + session persistence; Map this deal tick-to-add; meeting notes tidy-up + save; closing suggestions; template fill from matter; redlines accept/reject + save

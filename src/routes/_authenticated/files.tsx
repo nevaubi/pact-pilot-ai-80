@@ -43,7 +43,7 @@ function FilesHub() {
   const filtered = { ...q, data: q.data ? rows : undefined } as typeof q;
 
   return (
-    <div className="pb-10">
+    <div className="pb-8">
       <PageHeader
         title="Files"
         subtitle={
@@ -52,7 +52,7 @@ function FilesHub() {
             : "Add files from inside a matter so they stay organized."
         }
       />
-      <div className="px-4 md:px-8">
+      <div className="p-4 md:p-6">
         <div className="relative mb-4 max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -63,7 +63,7 @@ function FilesHub() {
             aria-label="Search files"
           />
         </div>
-        <div className="rounded-xl border bg-card px-4 py-2">
+        <div className="rounded border bg-card px-3 py-1">
           <ListState
             query={filtered}
             rows={4}

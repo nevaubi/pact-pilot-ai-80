@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Plus, ListChecks } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, ListChecks } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { draftClosingChecklist } from "@/lib/ai.functions";
 import { tableQ, logActivity } from "@/lib/data";
@@ -66,6 +66,8 @@ export function ClosingTab({ matterId }: { matterId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [sugg, setSugg] = useState<(Result & { effort: typeof effort }) | null>(null);
   const [pick, setPick] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("Final");
   const run = useServerFn(draftClosingChecklist);
 
   async function add() {
@@ -110,6 +112,27 @@ export function ClosingTab({ matterId }: { matterId: string }) {
       await mut(supabase.from("closing_items").delete().eq("id", id).select("id"), {
         success: "Item removed",
       });
+      inv();
+    });
+  }
+  async function move(index: number, delta: number) {
+    const other = data[index + delta];
+    const current = data[index];
+    if (!other || !current) return;
+    await tryAction(async () => {
+      await Promise.all([
+        mut(supabase.from("closing_items").update({ position: other.position }).eq("id", current.id).select("id")),
+        mut(supabase.from("closing_items").update({ position: current.position }).eq("id", other.id).select("id")),
+      ]);
+      inv();
+    });
+  }
+  async function applyBulk() {
+    if (!selected.size) return;
+    await tryAction(async () => {
+      await mut(supabase.from("closing_items").update({ status: bulkStatus }).in("id", [...selected]).select("id"), { success: `${selected.size} items updated` });
+      await logActivity(matterId, `${selected.size} closing items marked ${bulkStatus}`);
+      setSelected(new Set());
       inv();
     });
   }
@@ -185,6 +208,17 @@ export function ClosingTab({ matterId }: { matterId: string }) {
             {error}
           </p>
         )}
+        {selected.size > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded border bg-raised/60 p-2 text-xs">
+            <b>{selected.size} selected</b>
+            <Select value={bulkStatus} onValueChange={setBulkStatus}>
+              <SelectTrigger className="h-7 w-32" aria-label="Bulk status"><SelectValue /></SelectTrigger>
+              <SelectContent>{CLOSING_STATUS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+            </Select>
+            <Button size="sm" onClick={applyBulk}>Apply status</Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+          </div>
+        )}
         <form
           className="mb-4 flex flex-wrap gap-2"
           onSubmit={(e) => {
@@ -219,7 +253,8 @@ export function ClosingTab({ matterId }: { matterId: string }) {
               <table className="w-full min-w-[720px] text-sm">
                 <thead className="text-left text-xs text-muted-foreground">
                   <tr>
-                    <th className="py-1.5 pr-2">#</th>
+                     <th className="w-8 py-1.5 pr-2"><span className="sr-only">Select</span></th>
+                     <th className="py-1.5 pr-2">#</th>
                     <th className="pr-2">Deliverable</th>
                     <th className="pr-2">Responsible</th>
                     <th className="pr-2">Status</th>
@@ -231,6 +266,7 @@ export function ClosingTab({ matterId }: { matterId: string }) {
                 <tbody className="divide-y">
                   {rows.map((x, i) => (
                     <tr key={x.id} className="group align-top">
+                       <td className="py-2 pr-2"><Checkbox checked={selected.has(x.id)} onCheckedChange={(v) => { const next = new Set(selected); if (v) next.add(x.id); else next.delete(x.id); setSelected(next); }} aria-label={`Select ${x.deliverable}`} /></td>
                       <td className="py-2 pr-2 text-xs text-muted-foreground">{i + 1}</td>
                       <td className="py-2 pr-2 font-medium">{x.deliverable}</td>
                       <td className="py-1 pr-2">
@@ -284,12 +320,16 @@ export function ClosingTab({ matterId }: { matterId: string }) {
                           }
                         />
                       </td>
-                      <td className="py-1.5">
+                       <td className="py-1.5">
+                         <div className="flex items-center">
+                           <Button size="icon" variant="ghost" className="h-7 w-7" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${x.deliverable} up`}><ArrowUp className="h-3.5 w-3.5" /></Button>
+                           <Button size="icon" variant="ghost" className="h-7 w-7" disabled={i === rows.length - 1} onClick={() => move(i, 1)} aria-label={`Move ${x.deliverable} down`}><ArrowDown className="h-3.5 w-3.5" /></Button>
                         <DeleteButton
                           what="closing item"
                           onConfirm={() => del(x.id)}
                           className="opacity-0 focus-visible:opacity-100 group-hover:opacity-100 max-sm:opacity-100"
                         />
+                         </div>
                       </td>
                     </tr>
                   ))}

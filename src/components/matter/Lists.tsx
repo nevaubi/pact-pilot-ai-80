@@ -267,10 +267,7 @@ export function DeadlinesTab({ matterId }: { matterId: string }) {
             {rows.map((d) => {
               const { label, tone } = dueLabel(d.due_on);
               return (
-                <li
-                  key={d.id}
-                  className="group flex items-center gap-3 rounded-lg bg-raised px-3 py-2"
-                >
+                 <li key={d.id} className="group flex items-center gap-3 border-b px-2 py-2 last:border-b-0 hover:bg-raised/50">
                   <div className={`w-16 shrink-0 text-center text-xs font-semibold ${tone}`}>
                     {label}
                   </div>
@@ -387,7 +384,7 @@ function NoteCard({ note, onChanged }: { note: Tables<"notes">; onChanged: () =>
   }
 
   return (
-    <article className="group rounded-xl border bg-card p-4">
+    <article className="group rounded border bg-card p-3">
       <div className="mb-1 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">
           {note.title ?? "Note"}
@@ -550,7 +547,7 @@ export function ContactsTab({ matterId }: { matterId: string }) {
             {rows.map((mc) => (
               <li
                 key={mc.id}
-                className="group flex items-start justify-between gap-2 rounded-lg bg-raised p-3"
+                 className="group flex items-start justify-between gap-2 rounded border bg-raised/50 p-3"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{mc.contacts?.name}</p>

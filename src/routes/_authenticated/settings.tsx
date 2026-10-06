@@ -103,9 +103,9 @@ function Settings() {
   const mattersQ = { ...usage, data: usage.data?.matters };
 
   return (
-    <div className="pb-10">
+    <div className="pb-8">
       <PageHeader title="Settings" />
-      <div className="grid max-w-4xl gap-4 px-4 md:grid-cols-2 md:px-8">
+      <div className="grid max-w-5xl gap-4 p-4 md:grid-cols-2 md:p-6">
         <ProfilePanel />
         <Panel title="Appearance">
           <label className="flex items-center justify-between text-sm">
@@ -152,7 +152,7 @@ function Settings() {
           {usage.data && usage.data.kinds.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               {usage.data.kinds.map((k) => (
-                <span key={k.kind} className="rounded-md bg-raised px-2 py-1 text-muted-foreground">
+                <span key={k.kind} className="rounded bg-raised px-2 py-1 text-muted-foreground">
                   <b className="text-foreground">{KIND_LABEL[k.kind] ?? k.kind}</b> · {k.runs} ·{" "}
                   {k.tokens.toLocaleString()} tok
                 </span>
@@ -277,7 +277,7 @@ function ProfilePanel() {
 
 function Stat({ label, value, sub }: { label: string; value: number; sub?: string }) {
   return (
-    <div className="rounded-lg bg-raised p-3">
+    <div className="rounded border bg-raised/50 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-xl font-semibold tabular-nums">{value.toLocaleString()}</p>
       {sub && <p className="text-xs text-muted-foreground">{sub}</p>}

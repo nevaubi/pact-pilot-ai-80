@@ -25,13 +25,13 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3 px-4 pb-4 pt-6 md:px-8">
+    <header className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b bg-card px-4 py-3 md:px-6">
       <div>
-        <h1 className="text-2xl font-semibold">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
+        <h1 className="text-xl font-semibold leading-tight">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-xs font-medium text-muted-foreground">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-    </div>
+    </header>
   );
 }
 
@@ -47,14 +47,14 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`rounded-xl border bg-card ${className}`}>
+    <section className={`rounded border bg-card ${className}`}>
       {title && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
-          <h2 className="text-sm font-semibold">{title}</h2>
+        <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+          <h2 className="text-xs font-semibold uppercase text-muted-foreground">{title}</h2>
           {action}
         </div>
       )}
-      <div className="p-4">{children}</div>
+      <div className="p-3">{children}</div>
     </section>
   );
 }
@@ -62,7 +62,7 @@ export function Panel({
 export function PracticeChip({ area }: { area: string }) {
   return (
     <span
-      className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${practiceInk[area] ?? "bg-muted text-muted-foreground"}`}
+      className={`inline-flex rounded-sm px-1.5 py-0.5 text-[10px] font-semibold ${practiceInk[area] ?? "bg-muted text-muted-foreground"}`}
     >
       {area}
     </span>
@@ -94,7 +94,7 @@ export function Loading({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-2 py-1" aria-busy="true" aria-label="Loading">
       {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-9 w-full rounded-lg" style={{ opacity: 1 - i * 0.2 }} />
+        <Skeleton key={i} className="h-8 w-full rounded" style={{ opacity: 1 - i * 0.2 }} />
       ))}
     </div>
   );
@@ -109,7 +109,7 @@ export function LoadError({ error, retry }: { error: unknown; retry?: () => void
         ? String((error as { message: unknown }).message)
         : "Unknown error";
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-ink-red/30 bg-ink-red/5 px-3 py-2.5 text-sm">
+    <div className="flex flex-wrap items-center gap-3 rounded border border-ink-red/30 bg-ink-red/5 px-3 py-2.5 text-sm">
       <AlertTriangle className="h-4 w-4 shrink-0 text-ink-red" />
       <span className="min-w-0 flex-1">Couldn't load this. {humanize(msg)}</span>
       {retry && (
@@ -273,7 +273,7 @@ export function EffortToggle({
 }) {
   return (
     <div
-      className="inline-flex rounded-lg border bg-raised p-0.5 text-xs"
+      className="inline-flex rounded border bg-raised p-0.5 text-xs"
       role="radiogroup"
       aria-label="AI effort"
     >
@@ -283,7 +283,7 @@ export function EffortToggle({
           role="radio"
           aria-checked={value === e}
           onClick={() => onChange(e)}
-          className={`flex items-center gap-1 rounded-md px-2.5 py-1 font-medium transition-colors ${
+          className={`flex items-center gap-1 rounded-sm px-2.5 py-1 font-medium transition-colors ${
             value === e
               ? e === "advanced"
                 ? "bg-ink-purple text-primary-foreground"
@@ -311,7 +311,7 @@ export function EffortBadge({ effort }: { effort: Effort }) {
 
 export function ReviewBanner() {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-ink-amber/30 bg-ink-amber/10 px-3 py-2 text-xs text-foreground">
+    <div className="flex items-start gap-2 rounded border border-ink-amber/30 bg-ink-amber/10 px-3 py-2 text-xs text-foreground">
       <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-ink-amber" />
       <span>
         <b>Review before use.</b> This is a suggestion prepared for you — read it, check the

@@ -1,6 +1,6 @@
 export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
   return (
-    <div className={`${className} grid place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm`}>
+    <div className={`${className} grid place-items-center rounded bg-primary text-primary-foreground`}>
       <span className="font-display text-[0.95em] font-semibold leading-none">M</span>
     </div>
   );

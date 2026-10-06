@@ -186,10 +186,10 @@ function Stat({
   return (
     <button
       onClick={onClick}
-      className="rounded-xl border bg-card p-4 text-left transition-shadow hover:shadow-sm"
+      className="rounded border bg-card p-3 text-left transition-colors hover:border-primary/40 hover:bg-raised/30"
     >
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-semibold ${tone}`}>{value}</p>
+      <p className={`text-xl font-semibold ${tone}`}>{value}</p>
       {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
     </button>
   );

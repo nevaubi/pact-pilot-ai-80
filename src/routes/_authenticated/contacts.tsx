@@ -28,6 +28,7 @@ export const Route = createFileRoute("/_authenticated/contacts")({
     ],
   }),
   component: Contacts,
+  loader: ({ context }) => context.queryClient.ensureQueryData(contactsQ),
 });
 
 type Contact = Tables<"contacts">;
@@ -57,7 +58,7 @@ function Contacts() {
   const filtered = { ...q, data: q.data ? rows : undefined } as typeof q;
 
   return (
-    <div className="pb-10">
+    <div className="pb-8">
       <PageHeader
         title="Contacts"
         subtitle={q.data ? `${data.length} people` : undefined}
@@ -68,7 +69,7 @@ function Contacts() {
           </Button>
         }
       />
-      <div className="px-4 md:px-8">
+      <div className="p-4 md:p-6">
         <div className="relative mb-4 max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -89,12 +90,12 @@ function Contacts() {
           }
         >
           {(list) => (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="overflow-hidden rounded border bg-card">
               {list.map((c) => {
                 const on = (links.data ?? []).filter((l) => l.contact_id === c.id);
                 return (
-                  <div key={c.id} className="group flex gap-3 rounded-xl border bg-card p-4">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ink-blue/10 text-sm font-semibold text-ink-blue">
+                  <div key={c.id} className="group flex gap-3 border-b p-3 last:border-b-0 hover:bg-raised/50">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded bg-ink-blue/10 text-xs font-semibold text-ink-blue">
                       {c.name
                         .split(" ")
                         .map((s) => s[0])
