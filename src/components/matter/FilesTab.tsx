@@ -5,7 +5,7 @@ import { FileText, Upload, Map, Download, ScanText } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { mapDocument } from "@/lib/ai.functions";
-import { extractText } from "@/lib/extract";
+import { extractText, ocrPdf } from "@/lib/extract";
 import { tableQ, logActivity, fmtDate } from "@/lib/data";
 import { mut, tryAction, humanize } from "@/lib/mutate";
 import { useEffort } from "@/hooks/use-effort";
@@ -32,7 +32,11 @@ import { toast } from "sonner";
 export const MAX_FILE_MB = 25;
 const ACCEPT = ".pdf,.docx,.txt,.md";
 
-export async function uploadMatterFile(matterId: string | null, file: File) {
+export async function uploadMatterFile(
+  matterId: string | null,
+  file: File,
+  onOcr?: (page: number, total: number) => void,
+) {
   if (file.size > MAX_FILE_MB * 1024 * 1024)
     throw new Error(`${file.name} is larger than ${MAX_FILE_MB} MB.`);
   const path = `${matterId ?? "firm"}/${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, "_")}`;
@@ -44,6 +48,17 @@ export async function uploadMatterFile(matterId: string | null, file: File) {
     text = (await extractText(file)).replace(/\s+\n/g, "\n").trim().slice(0, 300000);
   } catch {
     readable = false;
+  }
+  if (text.length < 50 && file.name.toLowerCase().endsWith(".pdf")) {
+    try {
+      const o = (await ocrPdf(file, onOcr)).slice(0, 300000);
+      if (o.length > text.length) {
+        text = o;
+        readable = true;
+      }
+    } catch {
+      /* keep stored; user can retry from the list */
+    }
   }
   const { data, error: e2 } = await supabase
     .from("files")
