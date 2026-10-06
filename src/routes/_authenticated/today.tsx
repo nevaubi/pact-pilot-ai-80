@@ -1,15 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { PageHeader, Panel, Empty } from "@/components/kit";
-import { daysUntil, fmtDate } from "@/lib/data";
+import { PageHeader, Panel, ListState } from "@/components/kit";
+import { dueLabel, fmtDate, fmtDateTime, logActivity } from "@/lib/data";
+import { mut, tryAction } from "@/lib/mutate";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export const Route = createFileRoute("/_authenticated/today")({
   head: () => ({
     meta: [
       { title: "Today — Mirza" },
-      { name: "description", content: "Deadlines, open tasks and recent activity across your active matters." },
+      {
+        name: "description",
+        content: "Deadlines, open tasks and recent activity across your active matters.",
+      },
       { property: "og:title", content: "Today — Mirza" },
       { property: "og:description", content: "Your day across active matters." },
     ],
@@ -17,92 +21,186 @@ export const Route = createFileRoute("/_authenticated/today")({
   component: Today,
 });
 
+async function q<T>(
+  p: PromiseLike<{ data: T | null; error: { message: string } | null }>,
+): Promise<T> {
+  const { data, error } = await p;
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
 function Today() {
   const qc = useQueryClient();
   const deadlines = useQuery({
     queryKey: ["today-deadlines"],
-    queryFn: async () => (await supabase.from("deadlines").select("*, matters(id,title)").gte("due_on", new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10)).order("due_on").limit(12)).data ?? [],
+    queryFn: () =>
+      q(
+        supabase
+          .from("deadlines")
+          .select("*, matters!inner(id,title,status)")
+          .neq("matters.status", "Closed")
+          .gte("due_on", new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10))
+          .order("due_on")
+          .limit(15),
+      ),
   });
   const tasks = useQuery({
     queryKey: ["today-tasks"],
-    queryFn: async () => (await supabase.from("tasks").select("*, matters(id,title)").eq("done", false).order("due_on", { nullsFirst: false }).limit(15)).data ?? [],
+    queryFn: () =>
+      q(
+        supabase
+          .from("tasks")
+          .select("*, matters!inner(id,title,status)")
+          .eq("done", false)
+          .neq("matters.status", "Closed")
+          .order("due_on", { nullsFirst: false })
+          .limit(20),
+      ),
   });
   const activity = useQuery({
     queryKey: ["today-activity"],
-    queryFn: async () => (await supabase.from("activity").select("*, matters(id,title)").order("created_at", { ascending: false }).limit(12)).data ?? [],
+    queryFn: () =>
+      q(
+        supabase
+          .from("activity")
+          .select("*, matters(id,title)")
+          .order("created_at", { ascending: false })
+          .limit(15),
+      ),
   });
 
-  async function toggle(id: string, done: boolean) {
-    await supabase.from("tasks").update({ done }).eq("id", id);
-    qc.invalidateQueries({ queryKey: ["today-tasks"] });
+  async function toggle(id: string, done: boolean, matterId: string, title: string) {
+    await tryAction(async () => {
+      await mut(supabase.from("tasks").update({ done }).eq("id", id).select("id"), {
+        success: done ? "Task completed" : "Task reopened",
+      });
+      if (done) await logActivity(matterId, `Completed task: ${title}`);
+      qc.invalidateQueries({ queryKey: ["today-tasks"] });
+      qc.invalidateQueries({ queryKey: ["today-activity"] });
+      qc.invalidateQueries({ queryKey: ["tasks", matterId] });
+    });
   }
 
-  const today = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <div className="pb-10">
       <PageHeader title="Today" subtitle={today} />
       <div className="grid gap-4 px-4 md:px-8 lg:grid-cols-3">
         <Panel title="Deadlines" className="lg:col-span-1">
-          {deadlines.data?.length ? (
-            <ul className="space-y-2">
-              {deadlines.data.map((d) => {
-                const n = daysUntil(d.due_on);
-                const tone = n < 0 ? "text-ink-red" : n <= 7 ? "text-ink-amber" : "text-muted-foreground";
-                return (
-                  <li key={d.id} className="flex items-start justify-between gap-2 rounded-lg bg-raised px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{d.title}</p>
-                      {d.matters && (
-                        <Link to="/matters/$id" params={{ id: d.matters.id }} className="truncate text-xs text-muted-foreground hover:text-primary">
+          <ListState query={deadlines} empty="No upcoming deadlines on open matters.">
+            {(rows) => (
+              <ul className="space-y-2">
+                {rows.map((d) => {
+                  const { label, tone } = dueLabel(d.due_on);
+                  return (
+                    <li
+                      key={d.id}
+                      className="flex items-start justify-between gap-2 rounded-lg bg-raised px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{d.title}</p>
+                        <Link
+                          to="/matters/$id"
+                          params={{ id: d.matters.id }}
+                          search={{ tab: "Deadlines" }}
+                          className="block truncate text-xs text-muted-foreground hover:text-primary"
+                        >
                           {d.matters.title}
                         </Link>
-                      )}
-                    </div>
-                    <div className={`shrink-0 text-right text-xs ${tone}`}>
-                      <div className="font-semibold">{n < 0 ? `${-n}d overdue` : n === 0 ? "Today" : `${n}d`}</div>
-                      <div>{fmtDate(d.due_on)}</div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <Empty>No upcoming deadlines.</Empty>
-          )}
+                      </div>
+                      <div className={`shrink-0 text-right text-xs ${tone}`}>
+                        <div className="font-semibold">{label}</div>
+                        <div>{fmtDate(d.due_on)}</div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </ListState>
         </Panel>
         <Panel title="Open tasks" className="lg:col-span-1">
-          {tasks.data?.length ? (
-            <ul className="divide-y">
-              {tasks.data.map((t) => (
-                <li key={t.id} className="flex items-start gap-3 py-2">
-                  <Checkbox className="mt-0.5" checked={t.done} onCheckedChange={(v) => toggle(t.id, !!v)} aria-label={`Complete ${t.title}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm">{t.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {t.matters?.title} · {t.assignee ?? "Unassigned"} {t.due_on && `· ${fmtDate(t.due_on)}`}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty>All caught up.</Empty>
-          )}
+          <ListState query={tasks} empty="All caught up — no open tasks.">
+            {(rows) => (
+              <ul className="divide-y">
+                {rows.map((t) => {
+                  const d = t.due_on ? dueLabel(t.due_on) : null;
+                  return (
+                    <li key={t.id} className="flex items-start gap-3 py-2">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={t.done}
+                        onCheckedChange={(v) => toggle(t.id, !!v, t.matter_id, t.title)}
+                        aria-label={`Complete ${t.title}`}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm">{t.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          <Link
+                            to="/matters/$id"
+                            params={{ id: t.matters.id }}
+                            search={{ tab: "Tasks" }}
+                            className="hover:text-primary"
+                          >
+                            {t.matters.title}
+                          </Link>
+                          {" · "}
+                          {t.assignee ?? "Unassigned"}
+                          {t.due_on && (
+                            <>
+                              {" "}
+                              ·{" "}
+                              <span className={d && d.n < 0 ? "font-medium text-ink-red" : ""}>
+                                {fmtDate(t.due_on)}
+                                {d && d.n < 0 ? ` (${d.label})` : ""}
+                              </span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </ListState>
         </Panel>
         <Panel title="Recent activity" className="lg:col-span-1">
-          {activity.data?.length ? (
-            <ul className="space-y-2.5">
-              {activity.data.map((a) => (
-                <li key={a.id} className="text-sm">
-                  <span className="font-medium">{a.actor}</span> <span className="text-muted-foreground">{a.message}</span>
-                  {a.matters && <span className="block text-xs text-muted-foreground">{a.matters.title} · {new Date(a.created_at).toLocaleString()}</span>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty>Nothing yet.</Empty>
-          )}
+          <ListState
+            query={activity}
+            empty="Nothing yet. Activity across all matters shows up here."
+          >
+            {(rows) => (
+              <ul className="space-y-2.5">
+                {rows.map((a) => (
+                  <li key={a.id} className="text-sm">
+                    <span className="font-medium">{a.actor}</span>{" "}
+                    <span className="text-muted-foreground">{a.message}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {a.matters ? (
+                        <Link
+                          to="/matters/$id"
+                          params={{ id: a.matters.id }}
+                          search={{ tab: "Activity" }}
+                          className="hover:text-primary"
+                        >
+                          {a.matters.title}
+                        </Link>
+                      ) : (
+                        "Firm"
+                      )}{" "}
+                      · {fmtDateTime(a.created_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ListState>
         </Panel>
       </div>
     </div>

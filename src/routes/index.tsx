@@ -7,9 +7,16 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Mirza — Matter management for boutique law firms" },
-      { name: "description", content: "Matters, deadlines, closings and house-template drafting with on-request AI support." },
+      {
+        name: "description",
+        content:
+          "Matters, deadlines, closings and house-template drafting with on-request AI support.",
+      },
       { property: "og:title", content: "Mirza" },
-      { property: "og:description", content: "Matter management for boutique transactional law firms." },
+      {
+        property: "og:description",
+        content: "Matter management for boutique transactional law firms.",
+      },
     ],
   }),
 });
