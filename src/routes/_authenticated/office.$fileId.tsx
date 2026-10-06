@@ -155,6 +155,12 @@ function OfficePage() {
     selection: (await editor.current?.getSelection()) || undefined,
   });
 
+  // Editor-reported problems (can't open, export failed) are shown and logged with the file kind, never its contents.
+  const onEditorError = (m: string) => {
+    toast.error(m);
+    logClientError(new Error(m), "office", { fileId, kind: kind ?? "unknown" });
+  };
+
   return (
     <div className="flex h-[calc(100vh-3rem)] min-h-0 flex-col md:h-screen">
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-card px-3 py-1.5">
@@ -183,8 +189,14 @@ function OfficePage() {
         )}
         {kind === "docx" && (
           <>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => editor.current?.acceptAllChanges?.()}>Accept all</Button>
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => editor.current?.rejectAllChanges?.()}>Reject all</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => tryAction(async () => {
+              await editor.current?.acceptAllChanges?.();
+              toast.success("All tracked changes accepted. Save to keep them.");
+            }, "Couldn't accept the changes")}>Accept all</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => tryAction(async () => {
+              await editor.current?.rejectAllChanges?.();
+              toast.success("All tracked changes rejected. Save to keep the document as it was.");
+            }, "Couldn't reject the changes")}>Reject all</Button>
           </>
         )}
         <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowVersions((v) => !v)}>
@@ -230,9 +242,9 @@ function OfficePage() {
       <div className={`grid min-h-0 flex-1 ${panel && matter ? "grid-cols-[1fr_22rem]" : "grid-cols-1"}`}>
         <div className="min-h-0 min-w-0">
           <Suspense fallback={<Skeleton className="m-6 h-[60vh]" />}>
-            {kind === "docx" && <DocxEditor blob={blob} name={file.name} user={user} mode={mode} onDirty={onDirty} handle={editor} onError={(m) => toast.error(m)} />}
-            {kind === "pdf" && <PdfViewer blob={blob} name={file.name} text={file.extracted_text ?? ""} author={user.name} dark={document.documentElement.classList.contains("dark")} onDirty={onDirty} handle={editor} onError={(m) => toast.error(m)} />}
-            {kind === "xlsx" && <SheetEditor blob={blob} name={file.name} onDirty={onDirty} handle={editor} onError={(m) => toast.error(m)} />}
+            {kind === "docx" && <DocxEditor blob={blob} name={file.name} user={user} mode={mode} onDirty={onDirty} handle={editor} onError={onEditorError} />}
+            {kind === "pdf" && <PdfViewer blob={blob} name={file.name} text={file.extracted_text ?? ""} author={user.name} dark={document.documentElement.classList.contains("dark")} onDirty={onDirty} handle={editor} onError={onEditorError} />}
+            {kind === "xlsx" && <SheetEditor blob={blob} name={file.name} onDirty={onDirty} handle={editor} onError={onEditorError} />}
             {(kind === "text" || !kind) && (
               <pre className="h-full overflow-auto whitespace-pre-wrap p-6 text-sm">{file.extracted_text ?? "This file type can't be opened in the editor. Download it instead."}</pre>
             )}
