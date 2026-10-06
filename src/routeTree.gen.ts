@@ -19,6 +19,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated/today'
 import { Route as ApiAssistRouteImport } from './routes/api/assist'
+import { Route as DevOfficeHarnessRouteImport } from './routes/dev.office-harness'
 import { Route as AuthenticatedMattersIndexRouteImport } from './routes/_authenticated/matters.index'
 import { Route as AuthenticatedMattersIdRouteImport } from './routes/_authenticated/matters.$id'
 import { Route as AuthenticatedOfficeFileIdRouteImport } from './routes/_authenticated/office.$fileId'
@@ -72,6 +73,11 @@ const ApiAssistRoute = ApiAssistRouteImport.update({
   path: '/api/assist',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevOfficeHarnessRoute = DevOfficeHarnessRouteImport.update({
+  id: '/dev/office-harness',
+  path: '/dev/office-harness',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedMattersIndexRoute =
   AuthenticatedMattersIndexRouteImport.update({
     id: '/matters/',
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/templates': typeof AuthenticatedTemplatesRoute
   '/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
+  '/dev/office-harness': typeof DevOfficeHarnessRoute
   '/matters/$id': typeof AuthenticatedMattersIdRoute
   '/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
   '/matters/': typeof AuthenticatedMattersIndexRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByTo {
   '/templates': typeof AuthenticatedTemplatesRoute
   '/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
+  '/dev/office-harness': typeof DevOfficeHarnessRoute
   '/matters/$id': typeof AuthenticatedMattersIdRoute
   '/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
   '/matters': typeof AuthenticatedMattersIndexRoute
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
+  '/dev/office-harness': typeof DevOfficeHarnessRoute
   '/_authenticated/matters/$id': typeof AuthenticatedMattersIdRoute
   '/_authenticated/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
   '/_authenticated/matters/': typeof AuthenticatedMattersIndexRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/today'
     | '/api/assist'
+    | '/dev/office-harness'
     | '/matters/$id'
     | '/office/$fileId'
     | '/matters/'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/today'
     | '/api/assist'
+    | '/dev/office-harness'
     | '/matters/$id'
     | '/office/$fileId'
     | '/matters'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/_authenticated/templates'
     | '/_authenticated/today'
     | '/api/assist'
+    | '/dev/office-harness'
     | '/_authenticated/matters/$id'
     | '/_authenticated/office/$fileId'
     | '/_authenticated/matters/'
@@ -185,6 +197,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiAssistRoute: typeof ApiAssistRoute
+  DevOfficeHarnessRoute: typeof DevOfficeHarnessRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -259,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev/office-harness': {
+      id: '/dev/office-harness'
+      path: '/dev/office-harness'
+      fullPath: '/dev/office-harness'
+      preLoaderRoute: typeof DevOfficeHarnessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/matters/': {
       id: '/_authenticated/matters/'
       path: '/matters'
@@ -315,6 +335,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiAssistRoute: ApiAssistRoute,
+  DevOfficeHarnessRoute: DevOfficeHarnessRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
