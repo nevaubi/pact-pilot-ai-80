@@ -8,6 +8,7 @@ import { fmtDate } from "@/lib/data";
 import { tryAction } from "@/lib/mutate";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { NewDocumentStrip } from "@/components/NewDocumentStrip";
 import { downloadFile, deleteFile } from "@/components/matter/FilesTab";
 
 export const Route = createFileRoute("/_authenticated/files")({
@@ -53,6 +54,9 @@ function FilesHub() {
         }
       />
       <div className="p-4 md:p-6">
+        <div className="mb-5">
+          <NewDocumentStrip />
+        </div>
         <div className="relative mb-4 max-w-xs">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
