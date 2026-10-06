@@ -107,11 +107,15 @@ export function wordEngine(d: DocApi): WordEngine {
       };
       // Treat the receipt as untrusted shape: a missing or malformed receipt must fail, not throw past the check.
       const r: unknown = await d.mutations.apply(input);
-      const x = (r && typeof r === "object" ? r : {}) as Partial<Awaited<ReturnType<DocApi["mutations"]["apply"]>>>;
+      const x = (r && typeof r === "object" ? r : {}) as Partial<
+        Awaited<ReturnType<DocApi["mutations"]["apply"]>>
+      >;
       return {
         success: x.success,
         ...(x.revision ? { revision: x.revision } : {}),
-        steps: Array.isArray(x.steps) ? x.steps.map((s) => ({ stepId: s.stepId, effect: s.effect })) : [],
+        steps: Array.isArray(x.steps)
+          ? x.steps.map((s) => ({ stepId: s.stepId, effect: s.effect }))
+          : [],
       };
     },
     count: async (text) => {

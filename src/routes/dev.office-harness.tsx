@@ -13,7 +13,10 @@ export const Route = createFileRoute("/dev/office-harness")({
   head: () => ({
     meta: [
       { title: "Office harness (dev only) — Mirza" },
-      { name: "description", content: "Development-only synthetic harness for the Office editors." },
+      {
+        name: "description",
+        content: "Development-only synthetic harness for the Office editors.",
+      },
       { property: "og:title", content: "Office harness (dev only) — Mirza" },
       { property: "og:description", content: "Development-only synthetic harness." },
       { property: "og:type", content: "website" },
@@ -24,9 +27,15 @@ export const Route = createFileRoute("/dev/office-harness")({
   component: Harness,
 });
 
-const DocxEditor = lazy(() => import("@/components/office/DocxEditor").then((m) => ({ default: m.DocxEditor })));
-const SheetEditor = lazy(() => import("@/components/office/SheetEditor").then((m) => ({ default: m.SheetEditor })));
-const DraftPanel = lazy(() => import("@/components/office/DraftPanel").then((m) => ({ default: m.DraftPanel })));
+const DocxEditor = lazy(() =>
+  import("@/components/office/DocxEditor").then((m) => ({ default: m.DocxEditor })),
+);
+const SheetEditor = lazy(() =>
+  import("@/components/office/SheetEditor").then((m) => ({ default: m.SheetEditor })),
+);
+const DraftPanel = lazy(() =>
+  import("@/components/office/DraftPanel").then((m) => ({ default: m.DraftPanel })),
+);
 
 async function makeDocx() {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
@@ -34,8 +43,17 @@ async function makeDocx() {
     sections: [
       {
         children: [
-          new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("ARTICLE 1 DEFINITIONS")] }),
-          new Paragraph({ children: [new TextRun("Seller shall deliver audited financial statements within ten (10) business days.")] }),
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun("ARTICLE 1 DEFINITIONS")],
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                "Seller shall deliver audited financial statements within ten (10) business days.",
+              ),
+            ],
+          }),
           new Paragraph({ children: [new TextRun("Buyer pays the fee.")] }),
           new Paragraph({ children: [new TextRun("Buyer pays the fee.")] }),
           new Paragraph({ children: [new TextRun("Closing shall occur on [[Closing Date]].")] }),
@@ -59,7 +77,9 @@ async function makeXlsx() {
   const b = wb.addWorksheet("Parcels");
   b.getCell("A1").value = "PIN";
   const out = await wb.xlsx.writeBuffer();
-  return new Blob([out as ArrayBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  return new Blob([out as ArrayBuffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
 }
 
 function Harness() {
