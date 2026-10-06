@@ -52,17 +52,56 @@ export const templatesQ = queryOptions({
   queryFn: () => q(supabase.from("templates").select("*").order("name")),
 });
 
-export async function logActivity(matterId: string | null, message: string) {
+let actorCache: { id: string; name: string } | null = null;
+
+/** Display name for the signed-in user: profile full name, else the email's local part. */
+export async function currentActor(): Promise<string> {
   const { data } = await supabase.auth.getUser();
-  await supabase.from("activity").insert({ matter_id: matterId, message, actor: data.user?.email?.split("@")[0] ?? "user" });
+  const u = data.user;
+  if (!u) return "user";
+  if (actorCache?.id === u.id) return actorCache.name;
+  const { data: p } = await supabase.from("profiles").select("full_name").eq("id", u.id).maybeSingle();
+  const name = p?.full_name?.trim() || (u.user_metadata?.["full_name"] as string | undefined)?.trim() || u.email?.split("@")[0] || "user";
+  actorCache = { id: u.id, name };
+  return name;
+}
+
+/** Best-effort audit line. Never throws — the action it describes already succeeded. */
+export async function logActivity(matterId: string | null, message: string) {
+  try {
+    const actor = await currentActor();
+    await supabase.from("activity").insert({ matter_id: matterId, message, actor });
+  } catch {
+    /* activity is informational */
+  }
+}
+
+/** Next sequential matter number for the current year, e.g. 2026-015. */
+export async function nextMatterNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const { data } = await supabase.from("matters").select("number").like("number", `${year}-%`);
+  const max = (data ?? []).reduce((m, r) => {
+    const n = Number((r.number ?? "").split("-")[1]);
+    return Number.isFinite(n) && n > m ? n : m;
+  }, 0);
+  return `${year}-${String(max + 1).padStart(3, "0")}`;
 }
 
 export function fmtDate(d?: string | null) {
   if (!d) return "—";
   return new Date(d + (d.length === 10 ? "T00:00:00" : "")).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
+export function fmtDateTime(d: string) {
+  return new Date(d).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
 export function daysUntil(d: string) {
   const t = new Date(d + "T00:00:00").getTime();
   const now = new Date(new Date().toDateString()).getTime();
   return Math.round((t - now) / 86400000);
 }
+/** "3d", "Today", "2d late" — shared by every deadline list. */
+export function dueLabel(d: string) {
+  const n = daysUntil(d);
+  return { n, label: n < 0 ? `${-n}d late` : n === 0 ? "Today" : `${n}d`, tone: n < 0 ? "text-ink-red" : n <= 7 ? "text-ink-amber" : "text-muted-foreground" };
+}
+export const todayISO = () => new Date().toISOString().slice(0, 10);

@@ -17,6 +17,7 @@ import { Route as AuthenticatedFilesRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated/today'
+import { Route as ApiAssistRouteImport } from './routes/api/assist'
 import { Route as AuthenticatedMattersIndexRouteImport } from './routes/_authenticated/matters.index'
 import { Route as AuthenticatedMattersIdRouteImport } from './routes/_authenticated/matters.$id'
 
@@ -59,6 +60,11 @@ const AuthenticatedTodayRoute = AuthenticatedTodayRouteImport.update({
   path: '/today',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiAssistRoute = ApiAssistRouteImport.update({
+  id: '/api/assist',
+  path: '/api/assist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedMattersIndexRoute =
   AuthenticatedMattersIndexRouteImport.update({
     id: '/matters/',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/today': typeof AuthenticatedTodayRoute
+  '/api/assist': typeof ApiAssistRoute
   '/matters/$id': typeof AuthenticatedMattersIdRoute
   '/matters/': typeof AuthenticatedMattersIndexRoute
 }
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/today': typeof AuthenticatedTodayRoute
+  '/api/assist': typeof ApiAssistRoute
   '/matters/$id': typeof AuthenticatedMattersIdRoute
   '/matters': typeof AuthenticatedMattersIndexRoute
 }
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/today': typeof AuthenticatedTodayRoute
+  '/api/assist': typeof ApiAssistRoute
   '/_authenticated/matters/$id': typeof AuthenticatedMattersIdRoute
   '/_authenticated/matters/': typeof AuthenticatedMattersIndexRoute
 }
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/templates'
     | '/today'
+    | '/api/assist'
     | '/matters/$id'
     | '/matters/'
   fileRoutesByTo: FileRoutesByTo
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/templates'
     | '/today'
+    | '/api/assist'
     | '/matters/$id'
     | '/matters'
   id:
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/templates'
     | '/_authenticated/today'
+    | '/api/assist'
     | '/_authenticated/matters/$id'
     | '/_authenticated/matters/'
   fileRoutesById: FileRoutesById
@@ -147,6 +159,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiAssistRoute: typeof ApiAssistRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTodayRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/assist': {
+      id: '/api/assist'
+      path: '/api/assist'
+      fullPath: '/api/assist'
+      preLoaderRoute: typeof ApiAssistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/matters/': {
       id: '/_authenticated/matters/'
       path: '/matters'
@@ -251,6 +271,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiAssistRoute: ApiAssistRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
