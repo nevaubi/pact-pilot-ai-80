@@ -8,6 +8,20 @@
       "when": 1791262825679,
       "tag": "0000_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791292122272,
+      "tag": "0001_law_library_reviews_real_estate",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791292724744,
+      "tag": "0002_seed_law_library_catalog",
+      "breakpoints": true
     }
   ]
 }

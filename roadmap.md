@@ -1,24 +1,22 @@
-# Mirza — deep second pass roadmap
+# Mirza — roadmap
 
 Priority order: (a) broken → (b) core non-AI flows → (c) AI desk → (d) polish.
 
-## Ready (next pass)
-- [x] OCR for scanned PDFs (browser Tesseract, auto on upload + "Read scanned text" button)
-- [x] Matter-level "Catch me up" action that opens Assist and prepares a focused status memo for optional note filing
-- [x] Bulk edit on the closing checklist (move controls and multi-select status)
-- [x] Deadline reminders on Today for the next 30 days
-- [x] Export matter summary (tasks, deadlines, checklist) to a Word-compatible document alongside drafts
+## In progress (this pass)
+- [ ] Law library: authoritative Illinois + federal sources auto-fetched and stored (eCFR, Federal Register, U.S. Code, IRS/IDOR publications, Cook County / Chicago pages, ILCS official links), full-text indexed, refreshable, fetch-on-request search of public law APIs, pin sources to a matter
+- [ ] Tax red-flag checker per matter: grounded on library passages, verbatim-anchored quotes, flags only (never advice), persisted, tick-to-add tasks
+- [ ] Real estate module: property & deal terms, business-day contract dates, Illinois/Cook/Chicago transfer tax + tax proration math with citations, jurisdiction requirements checklist, title commitment & survey review (AI, grounded, cross-referenced)
+- [ ] Office: Word (.docx) editor with high-fidelity rendering and tracked suggestions, PDF viewer/annotator, spreadsheet editor; AI drafting side panel connected to the matter's files, pinned sources, house templates and the open document
+- [ ] Compliance calendar generator (entity annual reports, UCC continuations) with authority links
 
-- [x] Core flows browser-verified: new/edit matter, tasks, deadlines, notes (add/edit), contacts link, file upload, closing items, reload keeps tab, contacts page add/edit, template upload+edit, settings profile
-- [x] AI flows browser-verified: Assist streaming + follow-up history + save-to-notes + session persistence; Map this deal tick-to-add; meeting notes tidy-up + save; closing suggestions; template fill from matter; redlines accept/reject + save
-- [x] AI hardening: friendly 400/401/402/403/404/429/5xx messages, bounded 429/5xx backoff, NoObjectGeneratedError fallback, run-ID reuse, streaming route for Assist, usage returned + shown on every result
-- [x] One-round-trip matter context with per-file and total document caps
-- [x] mut()/tryAction() on every write; confirmations on every delete; ListState loading/empty/error on every list
-- [x] Tab in URL; theme applied before paint; matter edit/delete; contact edit/delete; note edit/delete; draft delete/status/title; template original kept in storage
-- [x] Auth screens verified: wrong-password message, forgot-password form, sign-up form, sign-out → /auth, protected route redirect
-- [x] Assist Stop verified; 402 px phone layout verified (no horizontal scroll on matter, closing, draft); dark mode persists across navigation
-- [x] Matter delete verified: cascades tasks/files rows, removes storage objects, keeps ai_runs for cost history
-- [x] Test data cleaned (two test matters, test contact); sample house template kept as "Sample — Asset Purchase Agreement"
+## Ready (next pass)
+- [ ] Semantic retrieval (embeddings) over the law library in addition to full-text search
+- [ ] Case-law search (CourtListener) surfaced in Sources with court filters; token optional for higher limits
+- [ ] Scheduled library refresh without opening the Library page
 
 ## Done
-- [x] Replace template favicon with Mirza M and add polished homepage social preview/name/description, including redirect destinations.
+- [x] OCR for scanned PDFs (browser Tesseract, auto on upload + "Read scanned text" button)
+- [x] Matter-level "Catch me up"; bulk closing checklist edits; 30-day Today reminders; matter summary export
+- [x] Core and AI flows browser-verified; AI hardening (friendly errors, bounded backoff, run-ID reuse, streaming Assist)
+- [x] mut()/tryAction() on every write; confirmations on every delete; ListState on every list
+- [x] Compact professional UI pass; lazy-loaded heavy tabs; favicon + social preview

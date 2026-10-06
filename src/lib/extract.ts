@@ -1,5 +1,5 @@
 // Browser-side text extraction for uploaded documents (text only — no layout processing).
-export async function extractText(file: File): Promise<string> {
+export async function extractText(file: File, maxPages = 80): Promise<string> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".docx")) {
     const mammoth = await import("mammoth");
@@ -12,12 +12,29 @@ export async function extractText(file: File): Promise<string> {
     pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
     const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
     const pages: string[] = [];
-    for (let i = 1; i <= Math.min(doc.numPages, 80); i++) {
+    for (let i = 1; i <= Math.min(doc.numPages, maxPages); i++) {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
-      pages.push(content.items.map((it) => ("str" in it ? it.str : "")).join(" "));
+      // Keep line structure: pdf.js marks end-of-line items, which lets headings stand on their own.
+      let line = "";
+      const lines: string[] = [];
+      for (const it of content.items) {
+        if (!("str" in it)) continue;
+        line += it.str;
+        if (it.hasEOL) {
+          lines.push(line.trim());
+          line = "";
+        } else if (!it.str.endsWith(" ")) line += " ";
+      }
+      if (line.trim()) lines.push(line.trim());
+      pages.push(lines.join("\n"));
     }
     return pages.join("\n\n");
+  }
+  if (name.endsWith(".html") || name.endsWith(".htm")) {
+    const doc = new DOMParser().parseFromString(await file.text(), "text/html");
+    doc.querySelectorAll("script,style,noscript,nav,header,footer").forEach((n) => n.remove());
+    return (doc.body?.innerText ?? doc.body?.textContent ?? "").replace(/\n{3,}/g, "\n\n");
   }
   return await file.text();
 }
