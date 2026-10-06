@@ -40,11 +40,8 @@ export const reviewTitleSurvey = createServerFn({ method: "POST" })
         const t = (f.extracted_text ?? "").slice(0, cap);
         return `=== ${label}: ${f.name}${(f.extracted_text?.length ?? 0) > cap ? " (truncated)" : ""} ===\n${t || "[no readable text]"}\n`;
       };
-      const { data: prop } = await supabase.from("matter_properties").select("*").eq("matter_id", data.matterId).maybeSingle();
+      // matterContext already carries the property/deal record line when one exists.
       const ctx = await matterContext(supabase, data.matterId, data.effort, false);
-      const propLine = prop
-        ? `PROPERTY: ${[prop.address, prop.city, prop.state, prop.zip].filter(Boolean).join(", ")} | PIN ${prop.pin ?? "—"} | ${prop.property_type} | County ${prop.county}${prop.in_chicago ? " (Chicago)" : ""} | Our side: ${prop.side} | Price ${prop.purchase_price ?? "—"} | Loan ${prop.loan_amount ?? "—"} | Closing ${prop.closing_date ?? "—"} | Title co. ${prop.title_company ?? "—"} | Survey date ${prop.survey_date ?? "—"}`
-        : "PROPERTY: no property record yet.";
       const src = await matterSources(
         supabase,
         data.matterId,
@@ -107,7 +104,7 @@ Rules:
 - Cross-reference: for each exception, say what the survey shows (quoted) if a survey is provided; for each survey finding, name the exception it relates to.
 - Where a legal point is involved (lien waivers, transfer tax, FIRPTA, condominium disclosures), cite a SOURCE tag with a verbatim quote; otherwise leave basis empty.
 - Be concise and customary. Do not invent parties, dates or amounts; use "unknown" when the document is silent.`,
-        `${ctx}\n\n${propLine}\n\n${src.block}\n\n${doc(data.commitmentId, "TITLE COMMITMENT")}\n${doc(data.surveyId, "PLAT OF SURVEY")}\n${doc(data.contractId, "CONTRACT")}\n${data.instruction ? `ATTORNEY INSTRUCTION: ${data.instruction}\n` : ""}Review now.`,
+        `${ctx}\n\n${src.block}\n\n${doc(data.commitmentId, "TITLE COMMITMENT")}\n${doc(data.surveyId, "PLAT OF SURVEY")}\n${doc(data.contractId, "CONTRACT")}\n${data.instruction ? `ATTORNEY INSTRUCTION: ${data.instruction}\n` : ""}Review now.`,
         schema,
       );
       const flags = r.output.flags.map((f) => {

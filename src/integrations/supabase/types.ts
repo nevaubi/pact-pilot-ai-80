@@ -422,36 +422,80 @@ export type Database = {
           },
         ]
       }
+      file_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          file_id: string
+          id: string
+          note: string | null
+          path: string
+          size: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          file_id: string
+          id?: string
+          note?: string | null
+          path: string
+          size?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          file_id?: string
+          id?: string
+          note?: string | null
+          path?: string
+          size?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_versions_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       files: {
         Row: {
           created_at: string
           doc_type: string | null
+          edited_by: string | null
           extracted_text: string | null
           id: string
           matter_id: string | null
           name: string
           path: string
           size: number | null
+          updated_at: string
         }
         Insert: {
           created_at?: string
           doc_type?: string | null
+          edited_by?: string | null
           extracted_text?: string | null
           id?: string
           matter_id?: string | null
           name: string
           path: string
           size?: number | null
+          updated_at?: string
         }
         Update: {
           created_at?: string
           doc_type?: string | null
+          edited_by?: string | null
           extracted_text?: string | null
           id?: string
           matter_id?: string | null
           name?: string
           path?: string
           size?: number | null
+          updated_at?: string
         }
         Relationships: [
           {

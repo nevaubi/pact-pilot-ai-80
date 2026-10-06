@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { cloneElement, lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarPlus, Check, ExternalLink, Save, ListPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -422,11 +422,15 @@ export function RealEstateTab({ matter }: { matter: Tables<"matters"> }) {
   );
 }
 
-function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+function Field({ label, children, className = "" }: { label: string; children: React.ReactElement<{ id?: string }>; className?: string }) {
+  const id = `re-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const isSelect = children.type === Select;
   return (
     <div className={`space-y-1 ${className}`}>
-      <Label className="text-xs text-muted-foreground">{label}</Label>
-      {children}
+      <Label htmlFor={isSelect ? undefined : id} className="text-xs text-muted-foreground">
+        {label}
+      </Label>
+      {isSelect ? children : cloneElement(children, { id })}
     </div>
   );
 }

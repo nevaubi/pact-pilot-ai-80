@@ -287,7 +287,7 @@ export async function matterContext(
   const { data: m, error } = await supabase
     .from("matters")
     .select(
-      "number,title,client,practice_area,status,summary,responsible,opened_on,tasks(title,assignee,due_on,done),deadlines(title,due_on,kind),notes(title,body,created_at),closing_items(deliverable,responsible,status,due_on,position),files(name,extracted_text,created_at)",
+      "number,title,client,practice_area,status,summary,responsible,opened_on,tasks(title,assignee,due_on,done),deadlines(title,due_on,kind),notes(title,body,created_at),closing_items(deliverable,responsible,status,due_on,position),files(name,doc_type,extracted_text,created_at),matter_properties(*)",
     )
     .eq("id", matterId)
     .order("created_at", { referencedTable: "notes", ascending: false })
@@ -303,18 +303,21 @@ export async function matterContext(
   let budget = DOC_CHARS_TOTAL[effort];
   const docs = m.files
     .map((f) => {
+      const tag = f.doc_type ? ` [${f.doc_type.replace(/_/g, " ")}]` : "";
       if (!includeDocs || !f.extracted_text || budget <= 0)
-        return `- ${f.name}${f.extracted_text ? "" : " (no readable text)"}`;
+        return `- ${f.name}${tag}${f.extracted_text ? "" : " (no readable text)"}`;
       const slice = f.extracted_text.slice(0, Math.min(DOC_CHARS_PER_FILE, budget));
       budget -= slice.length;
-      return `--- ${f.name} ---\n${slice}${slice.length < f.extracted_text.length ? "\n[…truncated]" : ""}`;
+      return `--- ${f.name}${tag} ---\n${slice}${slice.length < f.extracted_text.length ? "\n[…truncated]" : ""}`;
     })
     .join("\n");
 
   const line = (s: string[]) => s.join("\n") || "none";
+  const prop = Array.isArray(m.matter_properties) ? m.matter_properties[0] : m.matter_properties;
+  const property = prop ? propertyLine(prop) : "";
   return `MATTER ${m.number ?? ""}: ${m.title}
 Client: ${m.client ?? "—"} | Practice: ${m.practice_area} | Status: ${m.status} | Responsible: ${m.responsible ?? "—"} | Opened: ${m.opened_on ?? "—"} | Today: ${new Date().toISOString().slice(0, 10)}
-Summary: ${m.summary ?? "—"}
+Summary: ${m.summary ?? "—"}${property ? `\n${property}` : ""}
 Tasks:
 ${line(m.tasks.map((x) => `- [${x.done ? "x" : " "}] ${x.title} (${x.assignee ?? "unassigned"}, due ${x.due_on ?? "—"})`))}
 Deadlines:
@@ -325,6 +328,17 @@ Recent notes:
 ${line(m.notes.map((x) => `- ${x.title ?? "Note"} (${x.created_at.slice(0, 10)}): ${x.body.slice(0, 600)}`))}
 Files:
 ${docs || "none"}`;
+}
+
+/** One-line property/deal record for prompts (Real Estate matters). Flags are spelled out so the model need not guess. */
+export function propertyLine(p: {
+  address: string | null; city: string | null; state: string; zip: string | null; pin: string | null; property_type: string; county: string; in_chicago: boolean;
+  side: string; purchase_price: number | null; earnest_money: number | null; loan_amount: number | null; lender: string | null; acceptance_date: string | null; closing_date: string | null;
+  title_company: string | null; survey_date: string | null; last_tax_bill: number | null; tax_year: number | null; flags: unknown; notes: string | null;
+}) {
+  const flags = (p.flags ?? {}) as Record<string, boolean>;
+  const on = Object.entries(flags).filter(([, v]) => v).map(([k]) => k);
+  return `Property (deal record): ${[p.address, p.city, p.state, p.zip].filter(Boolean).join(", ") || "address not entered"} | PIN ${p.pin ?? "—"} | ${p.property_type} | ${p.county} County${p.in_chicago ? ", City of Chicago" : ""} | Our side: ${p.side} | Price ${p.purchase_price ?? "—"} | Earnest ${p.earnest_money ?? "—"} | Loan ${p.loan_amount ?? "—"}${p.lender ? ` (${p.lender})` : ""} | Accepted ${p.acceptance_date ?? "—"} | Closing ${p.closing_date ?? "—"} | Title co. ${p.title_company ?? "—"} | Survey ${p.survey_date ?? "—"} | Last tax bill ${p.last_tax_bill ?? "—"}${p.tax_year ? ` (${p.tax_year})` : ""} | Flags: ${on.length ? on.join(", ") : "none"}${p.notes ? ` | Notes: ${p.notes.slice(0, 300)}` : ""}`;
 }
 
 export async function logRun(
@@ -350,6 +364,25 @@ export function askInstructions(effort: Effort) {
   return effort === "advanced"
     ? "Advanced effort: analyze carefully, flag issues and risks, and cite which part of the matter or document supports each point. When SOURCES are provided, ground legal points in them: cite the tag like [S2] right after the sentence and quote the operative words. Never cite a tag that was not provided and never state a rule you cannot support from the sources or the matter. End with a short 'For your review:' list naming what the attorney should check personally."
     : "Normal effort: practical case-management help. Keep it short and concrete. When SOURCES are provided and relevant, cite the tag like [S1] after the sentence; do not invent citations. End with one line 'For your review:' naming what to double-check.";
+}
+
+/**
+ * Drafting assistant inside the Office editors. The attorney has a document open; the model
+ * proposes text the attorney inserts or replaces by hand (tracked changes), so output must be
+ * clean, insertable prose in the document's own voice.
+ */
+export function draftInstructions(effort: Effort, kind: "docx" | "pdf" | "xlsx" | "text") {
+  const common = `You are working alongside the attorney inside an open ${kind === "xlsx" ? "spreadsheet" : kind === "pdf" ? "PDF" : "document"} (OPEN DOCUMENT below; SELECTION is the text the attorney has highlighted, if any).
+Drafting rules:
+- When asked to draft, rewrite, tighten or add language, answer with the proposed text itself inside a single fenced block marked \`\`\`draft so it can be inserted verbatim. Put any explanation outside the block, in one or two short lines.
+- Match the document's defined terms, numbering, tense, party names and tone exactly. Reuse the firm's wording from the open document and house templates rather than inventing new styles.
+- Never invent facts, dates, amounts or party details. Where a fact is unknown, leave a blank in the form [[Field Name]].
+- Keep proposals as small as the request allows: a clause, a sentence, a paragraph — not a rewrite of the whole document unless asked.
+- When SOURCES are provided and a point of law matters, cite the tag like [S1] after the sentence (outside the draft block) and quote the operative words; never cite a tag that was not provided.
+- For questions (not drafting), answer plainly from the open document and the matter; quote the passage you rely on.`;
+  const sheet = kind === "xlsx" ? `\n- For spreadsheet work, put proposed cell values or formulas inside the draft block one per line as A1-style references, e.g. \`B12 = =SUM(B2:B11)\`; show the reasoning outside the block.` : "";
+  const effortLine = effort === "advanced" ? "\nAdvanced effort: check the proposal against the rest of the document for conflicts (defined terms, cross-references, inconsistent dates or amounts) and list anything the attorney should reconcile under 'For your review:'." : "\nNormal effort: be quick and concrete; end with one line 'For your review:'.";
+  return common + sheet + effortLine;
 }
 
 // ---------- law-library grounding ----------

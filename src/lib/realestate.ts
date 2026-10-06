@@ -208,7 +208,7 @@ export function taxProration(p: { lastBill: number; pct: number; closing: string
     currentYearCredit: currentYear,
     priorYearUnpaid: prior,
     totalCredit: currentYear + prior,
-    basis: `Estimated ${y} taxes = last full-year bill × ${p.pct}% = $${estimated.toFixed(2)}; per diem $${perDiem.toFixed(4)} × ${dayOfYear} days (Jan 1 through closing) = $${currentYear.toFixed(2)}${prior ? `, plus unpaid prior-year taxes $${prior.toFixed(2)}` : ""}.`,
+    basis: `Estimated ${y} taxes = last full-year bill × ${p.pct}% = ${money(estimated)}; per diem $${perDiem.toFixed(4)} × ${dayOfYear} of ${daysInYear} days (Jan 1 through closing) = ${money(currentYear)}${prior ? `, plus unpaid prior-year taxes ${money(prior)}` : ""}.`,
     note: "Illinois property taxes are paid in arrears, so the seller credits the buyer at closing for taxes not yet billed. The proration percentage and the day-count convention come from the contract; Cook County bills in two installments (first installment 55% of the prior year's total).",
     cite: "35 ILCS 200/21-15, 21-25, 21-30 (installments); contract proration paragraph",
   };
