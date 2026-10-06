@@ -58,7 +58,9 @@ export function ErrorLogPanel() {
       return data as Row[];
     },
   });
-  const last7 = (q.data ?? []).filter((r) => Date.now() - new Date(r.created_at).getTime() < 7 * 864e5).length;
+  const last7 = (q.data ?? []).filter(
+    (r) => Date.now() - new Date(r.created_at).getTime() < 7 * 864e5,
+  ).length;
 
   function details(r: Row) {
     const ctx = r.context && typeof r.context === "object" ? JSON.stringify(r.context) : "";
@@ -86,17 +88,26 @@ export function ErrorLogPanel() {
             action="Clear log"
             onConfirm={() =>
               tryAction(async () => {
-                await mut(supabase.from("client_errors").delete().not("id", "is", null).select("id"), { success: "Error log cleared" });
+                await mut(
+                  supabase.from("client_errors").delete().not("id", "is", null).select("id"),
+                  { success: "Error log cleared" },
+                );
                 qc.invalidateQueries({ queryKey: ["client-errors"] });
               })
             }
           >
-            <Button size="sm" variant="ghost" className="h-7 text-xs">Clear</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs">
+              Clear
+            </Button>
           </Confirm>
         ) : null
       }
     >
-      <ListState query={q} rows={2} empty="No errors recorded. Problems anyone at the firm hits in the app — a page that fails, a save that doesn't go through, a document that won't open — appear here with the details support needs.">
+      <ListState
+        query={q}
+        rows={2}
+        empty="No errors recorded. Problems anyone at the firm hits in the app — a page that fails, a save that doesn't go through, a document that won't open — appear here with the details support needs."
+      >
         {(rows) => (
           <ul className="divide-y text-sm">
             {rows.map((r) => {
@@ -108,24 +119,37 @@ export function ErrorLogPanel() {
                     aria-expanded={expanded}
                     onClick={() => setOpen(expanded ? null : r.id)}
                   >
-                    {expanded ? <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                    {expanded ? (
+                      <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{r.message}</span>
                       <span className="block text-[11px] text-muted-foreground">
-                        {new Date(r.created_at).toLocaleString()} · {PAGE_LABEL(r.route)} · {SOURCE_LABEL[r.source] ?? r.source}
+                        {new Date(r.created_at).toLocaleString()} · {PAGE_LABEL(r.route)} ·{" "}
+                        {SOURCE_LABEL[r.source] ?? r.source}
                       </span>
                     </span>
                   </button>
                   {expanded && (
                     <div className="ml-5 mt-1.5 space-y-1.5">
-                      <pre className="max-h-48 overflow-auto rounded border bg-raised p-2 text-[11px] leading-relaxed whitespace-pre-wrap">{details(r)}</pre>
+                      <pre className="max-h-48 overflow-auto rounded border bg-raised p-2 text-[11px] leading-relaxed whitespace-pre-wrap">
+                        {details(r)}
+                      </pre>
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-6 text-xs"
-                        onClick={() => copyText(details(r), "Details copied — paste them into a support message.")}
+                        onClick={() =>
+                          copyText(
+                            details(r),
+                            "Details copied — paste them into a support message.",
+                          )
+                        }
                       >
-                        <Copy className="mr-1 h-3 w-3" />Copy details
+                        <Copy className="mr-1 h-3 w-3" />
+                        Copy details
                       </Button>
                     </div>
                   )}
@@ -136,7 +160,8 @@ export function ErrorLogPanel() {
         )}
       </ListState>
       <p className="mt-3 text-xs text-muted-foreground">
-        Only the error text, page and browser are recorded — never document contents or sign-in details. Entries are shared with everyone at the firm.
+        Only the error text, page and browser are recorded — never document contents or sign-in
+        details. Entries are shared with everyone at the firm.
       </p>
     </Panel>
   );

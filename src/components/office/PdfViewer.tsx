@@ -8,9 +8,19 @@ type Registry = {
 };
 
 type Task<T> = { toPromise: () => Promise<T> };
-type SelectionApi = { getSelectedText?: () => Task<string[]>; forDocument?: (id: string) => { getSelectedText: () => Task<string[]> } };
-type ExportApi = { saveAsCopy?: () => Task<ArrayBuffer>; forDocument?: (id: string) => { saveAsCopy: () => Task<ArrayBuffer> } };
-type AnnotationApi = { onAnnotationEvent?: (cb: (e: { type?: string; committed?: boolean }) => void) => (() => void) | void };
+type SelectionApi = {
+  getSelectedText?: () => Task<string[]>;
+  forDocument?: (id: string) => { getSelectedText: () => Task<string[]> };
+};
+type ExportApi = {
+  saveAsCopy?: () => Task<ArrayBuffer>;
+  forDocument?: (id: string) => { saveAsCopy: () => Task<ArrayBuffer> };
+};
+type AnnotationApi = {
+  onAnnotationEvent?: (
+    cb: (e: { type?: string; committed?: boolean }) => void,
+  ) => (() => void) | void;
+};
 
 type Props = {
   blob: Blob;
@@ -29,8 +39,20 @@ type Props = {
  * Highlights, notes, shapes, search and text selection come from the drop-in viewer; the
  * annotated copy is saved back to the matter as a new version. Nothing leaves the browser.
  */
-export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, onError, handle }: Props) {
-  const [Viewer, setViewer] = useState<null | typeof import("@embedpdf/react-pdf-viewer").PDFViewer>(null);
+export function PdfViewer({
+  blob,
+  name,
+  text,
+  author,
+  dark,
+  onDirty,
+  onReady,
+  onError,
+  handle,
+}: Props) {
+  const [Viewer, setViewer] = useState<
+    null | typeof import("@embedpdf/react-pdf-viewer").PDFViewer
+  >(null);
   const [failed, setFailed] = useState<string | null>(null);
   const registryRef = useRef<Registry | null>(null);
   const offRef = useRef<(() => void) | null>(null);
@@ -75,7 +97,10 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
           return "";
         }
       },
-      insert: async () => ({ ok: false, reason: "PDF text can't be edited here — copy the proposal, or open the Word original." }),
+      insert: async () => ({
+        ok: false,
+        reason: "PDF text can't be edited here — copy the proposal, or open the Word original.",
+      }),
       export: async () => {
         const reg = registryRef.current;
         if (!reg) throw new Error("The viewer isn't ready yet.");
@@ -120,7 +145,9 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
             light: { accent: { primary: "#3B82F6" } },
             dark: { accent: { primary: "#3B82F6" } },
           },
-          documentManager: { initialDocuments: [{ url, documentId: docId, name, autoActivate: true }] },
+          documentManager: {
+            initialDocuments: [{ url, documentId: docId, name, autoActivate: true }],
+          },
           annotations: { annotationAuthor: author, deactivateToolAfterCreate: true },
           export: { defaultFileName: name },
           disabledCategories: ["signature"],
@@ -141,8 +168,12 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
           }
         }}
         onInit={(container) => {
-          const el = container as unknown as { addEventListener?: (t: string, cb: (e: unknown) => void) => void };
-          el.addEventListener?.("error", (e) => onError?.(String((e as { detail?: unknown }).detail ?? "PDF error")));
+          const el = container as unknown as {
+            addEventListener?: (t: string, cb: (e: unknown) => void) => void;
+          };
+          el.addEventListener?.("error", (e) =>
+            onError?.(String((e as { detail?: unknown }).detail ?? "PDF error")),
+          );
         }}
       />
     </div>

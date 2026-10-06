@@ -9,7 +9,13 @@ import { reportLovableError } from "@/lib/lovable-error-reporting";
 
 export type ErrorSource = "boundary" | "window" | "promise" | "office" | "save" | "ai" | "manual";
 
-type Entry = { route: string; source: ErrorSource; message: string; stack: string | null; context: Record<string, unknown> };
+type Entry = {
+  route: string;
+  source: ErrorSource;
+  message: string;
+  stack: string | null;
+  context: Record<string, unknown>;
+};
 
 const RECENT_WINDOW_MS = 15_000;
 const MAX_PER_MINUTE = 20;
@@ -27,8 +33,13 @@ const NOISE = [
 ];
 
 function describe(error: unknown): { message: string; stack: string | null } {
-  if (error instanceof Response) return { message: `Response ${error.status}${error.url ? ` at ${error.url}` : ""}`, stack: null };
-  if (error instanceof Error) return { message: error.message || error.name || "Error", stack: error.stack ?? null };
+  if (error instanceof Response)
+    return {
+      message: `Response ${error.status}${error.url ? ` at ${error.url}` : ""}`,
+      stack: null,
+    };
+  if (error instanceof Error)
+    return { message: error.message || error.name || "Error", stack: error.stack ?? null };
   if (typeof error === "string") return { message: error, stack: null };
   try {
     return { message: JSON.stringify(error).slice(0, 500), stack: null };
@@ -83,7 +94,11 @@ async function persist(entry: Entry) {
 }
 
 /** Record an error. Safe to call anywhere in the browser; no-op during SSR. */
-export function logClientError(error: unknown, source: ErrorSource = "manual", context: Record<string, unknown> = {}) {
+export function logClientError(
+  error: unknown,
+  source: ErrorSource = "manual",
+  context: Record<string, unknown> = {},
+) {
   if (typeof window === "undefined") return;
   const { message, stack } = describe(error);
   if (!message || NOISE.some((re) => re.test(message))) return;
@@ -102,7 +117,11 @@ export function installErrorLogging() {
   window.addEventListener("error", (ev) => {
     // Resource load failures (img/script) have no error object and are noise here.
     if (!ev.error && !ev.message) return;
-    logClientError(ev.error ?? ev.message, "window", { filename: ev.filename, line: ev.lineno, col: ev.colno });
+    logClientError(ev.error ?? ev.message, "window", {
+      filename: ev.filename,
+      line: ev.lineno,
+      col: ev.colno,
+    });
   });
   window.addEventListener("unhandledrejection", (ev) => {
     logClientError(ev.reason, "promise");
@@ -110,7 +129,11 @@ export function installErrorLogging() {
 }
 
 /** Error boundaries: log to the firm's error log and to the Lovable preview reporter. */
-export function logBoundaryError(error: unknown, boundary: string, context: Record<string, unknown> = {}) {
+export function logBoundaryError(
+  error: unknown,
+  boundary: string,
+  context: Record<string, unknown> = {},
+) {
   reportLovableError(error, { boundary, ...context });
   logClientError(error, "boundary", { boundary, ...context });
 }

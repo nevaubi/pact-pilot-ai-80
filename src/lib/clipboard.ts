@@ -7,7 +7,9 @@ export async function copyText(text: string, success = "Copied") {
     toast.success(success);
     return true;
   } catch {
-    toast.error("Couldn't copy to the clipboard.", { description: "Select the text and copy it manually." });
+    toast.error("Couldn't copy to the clipboard.", {
+      description: "Select the text and copy it manually.",
+    });
     return false;
   }
 }

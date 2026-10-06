@@ -43,7 +43,8 @@ type Api = {
 /** One `B12 = =SUM(B2:B11)` / `Deadlines!C4 = 2026-03-31` line from a proposal. */
 export type CellAssignment = { sheet?: string; cell: string; value: string };
 
-const CELL_LINE = /^\s*(?:[-*]\s*)?(?:`)?(?:(?:'([^']+)'|"([^"]+)"|([A-Za-z0-9_ ]+?))!)?\$?([A-Za-z]{1,3})\$?(\d{1,7})(?:`)?\s*(?::|=|→|->)\s*(.+?)\s*$/;
+const CELL_LINE =
+  /^\s*(?:[-*]\s*)?(?:`)?(?:(?:'([^']+)'|"([^"]+)"|([A-Za-z0-9_ ]+?))!)?\$?([A-Za-z]{1,3})\$?(\d{1,7})(?:`)?\s*(?::|=|→|->)\s*(.+?)\s*$/;
 
 /** Parse proposal lines into cell assignments; lines that aren't assignments are ignored. */
 export function parseCellAssignments(text: string): CellAssignment[] {
@@ -55,7 +56,10 @@ export function parseCellAssignments(text: string): CellAssignment[] {
     if (!col || !row) continue;
     let value = rhs.trim();
     // Strip inline-code ticks and a trailing explanation after " — " or " // ".
-    value = value.replace(/^`([^`]*)`.*$/, "$1").replace(/\s+(?:—|–|\/\/|#)\s.*$/, "").trim();
+    value = value
+      .replace(/^`([^`]*)`.*$/, "$1")
+      .replace(/\s+(?:—|–|\/\/|#)\s.*$/, "")
+      .trim();
     if (/^".*"$/.test(value) || /^'.*'$/.test(value)) value = value.slice(1, -1);
     const sheet = (q1 ?? q2 ?? bare)?.trim();
     out.push({ ...(sheet ? { sheet } : {}), cell: `${col.toUpperCase()}${row}`, value });
@@ -85,13 +89,14 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
     let sub: { dispose: () => void } | undefined;
     (async () => {
       try {
-        const [{ createUniver, LocaleType, mergeLocales }, { UniverSheetsCorePreset }, en, data] = await Promise.all([
-          import("@univerjs/presets"),
-          import("@univerjs/preset-sheets-core"),
-          import("@univerjs/preset-sheets-core/locales/en-US"),
-          blob.arrayBuffer().then((b) => xlsxToWorkbook(b, name)),
-          import("@univerjs/preset-sheets-core/lib/index.css"),
-        ]);
+        const [{ createUniver, LocaleType, mergeLocales }, { UniverSheetsCorePreset }, en, data] =
+          await Promise.all([
+            import("@univerjs/presets"),
+            import("@univerjs/preset-sheets-core"),
+            import("@univerjs/preset-sheets-core/locales/en-US"),
+            blob.arrayBuffer().then((b) => xlsxToWorkbook(b, name)),
+            import("@univerjs/preset-sheets-core/lib/index.css"),
+          ]);
         if (disposed || !hostRef.current) return;
         const made = createUniver({
           locale: LocaleType.EN_US,
@@ -145,7 +150,10 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
           const r = sheet?.getSelection()?.getActiveRange();
           const v = r?.getValues() ?? [];
           if (!r || !sheet || (v.length === 1 && v[0]?.length === 1)) return "";
-          const grid = v.map((row) => row.map((c) => (c == null ? "" : String(c))).join("\t")).join("\n").trim();
+          const grid = v
+            .map((row) => row.map((c) => (c == null ? "" : String(c))).join("\t"))
+            .join("\n")
+            .trim();
           return `Selected ${r.getA1Notation()} on sheet "${sheet.getSheetName()}":\n${grid}`;
         } catch {
           return "";
@@ -159,10 +167,19 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
           if (assignments.length === 0) {
             // Free text: put it in the selected cell only.
             const r = wb.getActiveSheet().getSelection()?.getActiveRange();
-            if (!r) return { ok: false, reason: "Click a cell first, or ask for cell assignments like B12 = =SUM(B2:B11)." };
+            if (!r)
+              return {
+                ok: false,
+                reason: "Click a cell first, or ask for cell assignments like B12 = =SUM(B2:B11).",
+              };
             r.setValue(text.trim());
             onDirty();
-            return { ok: true, tracked: false, how: "cells", detail: `Written to ${r.getA1Notation()}.` };
+            return {
+              ok: true,
+              tracked: false,
+              how: "cells",
+              detail: `Written to ${r.getA1Notation()}.`,
+            };
           }
           const missing: string[] = [];
           const touched: string[] = [];
@@ -178,22 +195,42 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
             const wasBlank = range.isBlank?.() ?? false;
             if (a.value.startsWith("=")) range.setFormula(a.value);
             else range.setValue(value);
-            if (wasBlank && (typeof value === "number" || a.value.startsWith("=")) && !(range.getNumberFormat?.() || "").replace(/General/i, "")) {
+            if (
+              wasBlank &&
+              (typeof value === "number" || a.value.startsWith("=")) &&
+              !(range.getNumberFormat?.() || "").replace(/General/i, "")
+            ) {
               const m = /^([A-Z]+)(\d+)$/.exec(a.cell);
-              const above = m && Number(m[2]) > 1 ? sheet.getRange(`${m[1]}${Number(m[2]) - 1}`) : null;
+              const above =
+                m && Number(m[2]) > 1 ? sheet.getRange(`${m[1]}${Number(m[2]) - 1}`) : null;
               const fmt = above?.getNumberFormat?.();
               if (fmt && !/General/i.test(fmt)) range.setNumberFormat?.(fmt);
             }
             touched.push(a.sheet ? `${a.sheet}!${a.cell}` : a.cell);
           }
-          if (touched.length === 0) return { ok: false, reason: `No sheet named ${missing.map((m) => m.split("!")[0]).join(", ")} in this workbook.` };
+          if (touched.length === 0)
+            return {
+              ok: false,
+              reason: `No sheet named ${missing.map((m) => m.split("!")[0]).join(", ")} in this workbook.`,
+            };
           onDirty();
-          const list = touched.length <= 6 ? touched.join(", ") : `${touched.slice(0, 5).join(", ")} and ${touched.length - 5} more`;
+          const list =
+            touched.length <= 6
+              ? touched.join(", ")
+              : `${touched.slice(0, 5).join(", ")} and ${touched.length - 5} more`;
           const skipped = missing.length ? ` Skipped ${missing.length} on an unknown sheet.` : "";
-          return { ok: true, tracked: false, how: "cells", detail: `Updated ${list}.${skipped} Review them, then save.` };
+          return {
+            ok: true,
+            tracked: false,
+            how: "cells",
+            detail: `Updated ${list}.${skipped} Review them, then save.`,
+          };
         } catch (e) {
           logClientError(e, "office", { kind: "xlsx", stage: "apply-cells" });
-          return { ok: false, reason: e instanceof Error ? e.message : "The spreadsheet couldn't apply that change." };
+          return {
+            ok: false,
+            reason: e instanceof Error ? e.message : "The spreadsheet couldn't apply that change.",
+          };
         }
       },
       export: async () => {

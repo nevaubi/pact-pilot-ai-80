@@ -18,7 +18,9 @@ export async function mut<R extends Result>(
   const { data, error } = await p;
   if (error) {
     toast.error(opts.failure ?? "That didn't save", { description: humanize(error.message) });
-    logClientError(new Error(error.message), "save", { action: opts.failure ?? opts.success ?? "write" });
+    logClientError(new Error(error.message), "save", {
+      action: opts.failure ?? opts.success ?? "write",
+    });
     throw new ToastedError(error.message);
   }
   if (opts.success) toast.success(opts.success);
