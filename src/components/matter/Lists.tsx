@@ -135,7 +135,7 @@ export function NotesTab({ matterId }: { matterId: string }) {
             <h3 className="text-sm font-semibold">{n.title ?? "Note"} {n.kind === "meeting" && <span className="ml-1 rounded bg-ink-teal/10 px-1.5 text-[10px] text-ink-teal">Meeting</span>}</h3>
             <span className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</span>
           </div>
-          <div className="prose prose-sm max-w-none text-sm text-foreground dark:prose-invert"><ReactMarkdown>{n.body}</ReactMarkdown></div>
+          <div className="md text-sm"><ReactMarkdown>{n.body}</ReactMarkdown></div>
         </article>
       ))}
       <MeetingNotesDialog matterId={matterId} open={meeting} onOpenChange={setMeeting} />
