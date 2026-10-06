@@ -30,7 +30,7 @@ export const Route = createFileRoute("/api/transcribe")({
         const { authFromRequest } = await import("@/lib/auth.server");
         const auth = await authFromRequest(request);
         if (!auth) return json({ error: "Please sign in again." }, 401);
-        const key = process.env.LOVABLE_API_KEY;
+        const key = process.env["LOVABLE_API_KEY"];
         if (!key) return json({ error: "AI is not configured." }, 500);
 
         const declared = Number(request.headers.get("content-length") ?? "");
