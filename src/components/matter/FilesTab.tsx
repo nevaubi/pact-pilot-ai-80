@@ -114,20 +114,38 @@ export function FilesTab({ matterId }: { matterId: string }) {
     const files = Array.from(list ?? []);
     if (!files.length) return;
     for (const f of files) {
-      setBusy(f.name);
+      setBusy(`Uploading ${f.name}…`);
       await tryAction(async () => {
-        const { readable } = await uploadMatterFile(matterId, f);
+        const { readable } = await uploadMatterFile(matterId, f, (p, n) =>
+          setBusy(`Reading scanned page ${p} of ${n} — ${f.name}`),
+        );
         await logActivity(matterId, `Added file ${f.name}`);
         if (readable)
           toast.success(`${f.name} added`, { description: "Text extracted — ready to map." });
         else
           toast.warning(`${f.name} added, but no readable text`, {
-            description:
-              "Scanned PDFs and images can't be mapped yet. The file is still stored on the matter.",
+            description: "Text couldn't be read from this file. It is still stored on the matter.",
           });
       }, "Upload failed");
       refresh();
     }
+    setBusy(null);
+  }
+
+  async function readScanned(f: Tables<"files">) {
+    setBusy(`Reading ${f.name}…`);
+    await tryAction(async () => {
+      const { data, error } = await supabase.storage.from("matter-files").download(f.path);
+      if (error || !data) throw new Error(humanize(error?.message ?? "Download failed"));
+      const text = (
+        await ocrPdf(data, (p, n) => setBusy(`Reading scanned page ${p} of ${n} — ${f.name}`))
+      ).slice(0, 300000);
+      if (text.length < 20) throw new Error("No text could be recognised in this document.");
+      await mut(supabase.from("files").update({ extracted_text: text }).eq("id", f.id).select("id"), {
+        success: `${f.name}: text read — ready to map`,
+      });
+      refresh();
+    }, "Couldn't read the scanned document");
     setBusy(null);
   }
 
