@@ -370,11 +370,12 @@ const SOURCE_BUDGET: Record<Effort, number> = { normal: 9_000, advanced: 26_000 
 export async function matterSources(
   supabase: DB,
   matterId: string,
-  practiceArea: string,
+  practiceArea: string | undefined,
   queries: string[],
   effort: Effort,
-  budget = SOURCE_BUDGET[effort],
+  o: { budget?: number; topic?: string } = {},
 ) {
+  const budget = o.budget ?? SOURCE_BUDGET[effort];
   const { libraryPassages, renderPassages } = await import("./library.server");
   const topicByPractice: Record<string, string> = {
     "Real Estate": "real_estate",
@@ -383,12 +384,16 @@ export async function matterSources(
     Finance: "finance",
     Compliance: "compliance",
   };
+  if (!practiceArea) {
+    const { data } = await supabase.from("matters").select("practice_area").eq("id", matterId).maybeSingle();
+    practiceArea = data?.practice_area ?? "";
+  }
   const pinned = await pinnedAuthorityIds(supabase, matterId);
   const qs = queries.map((q) => q.trim()).filter((q) => q.length >= 3).slice(0, 10);
   let passages = pinned.length ? await libraryPassages(supabase, qs, { ids: pinned, charBudget: Math.round(budget * 0.6), perQuery: 4 }) : [];
   const remaining = budget - passages.reduce((n, p) => n + p.body.length, 0);
   if (remaining > 1500) {
-    const topic = topicByPractice[practiceArea];
+    const topic = o.topic ?? topicByPractice[practiceArea];
     const more = await libraryPassages(supabase, qs, { ...(topic ? { topic } : {}), charBudget: remaining, perQuery: 4 });
     const seen = new Set(passages.map((p) => `${p.authority_id}:${p.heading ?? ""}:${p.body.slice(0, 40)}`));
     for (const p of more) {
