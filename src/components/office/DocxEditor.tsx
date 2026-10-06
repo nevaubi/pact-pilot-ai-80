@@ -3,6 +3,8 @@ import type { SuperDoc as SuperDocType } from "superdoc";
 import "superdoc/style.css";
 import { Skeleton } from "@/components/ui/skeleton";
 import { logClientError } from "@/lib/error-log";
+import { applyWordEdits, resolveReplaceTarget, type ApplyResult, type MatchTarget, type WordEngine } from "@/lib/office-apply";
+import type { Proposal } from "@/lib/office-tools";
 
 export type DocMode = "editing" | "suggesting" | "viewing";
 
@@ -24,6 +26,10 @@ export type EditorHandle = {
   insert: (text: string, mode: "cursor" | "replace", anchor?: string) => Promise<InsertResult>;
   /** Serialize the current document for saving. */
   export: () => Promise<Blob>;
+  /** Apply a validated structured proposal (Word edits or sheet ops) after the attorney clicks Apply. */
+  applyProposal?: (p: Proposal) => Promise<ApplyResult>;
+  /** Spreadsheet snapshot (values + formulas) for the assistant's cell tools. */
+  getWorkbook?: () => Promise<import("@/lib/office-tools").WorkbookSnap>;
   setMode?: (mode: DocMode) => void;
   acceptAllChanges?: () => Promise<void>;
   rejectAllChanges?: () => Promise<void>;
@@ -42,6 +48,42 @@ type Props = {
 };
 
 type DocApi = NonNullable<NonNullable<SuperDocType["activeEditor"]>["doc"]>;
+
+const TRACKED = { changeMode: "tracked" } as const;
+
+function receipt(r: unknown): { success: boolean; message?: string } {
+  const x = r as { success?: boolean; failure?: { message?: string } } | undefined;
+  return x && x.success === false ? { success: false, message: x.failure?.message || "The editor declined the change." } : { success: true };
+}
+
+function plainError(e: unknown) {
+  const m = e instanceof Error ? e.message : "";
+  if (/no change/i.test(m)) return "The proposal is identical to the text it would replace — nothing to change.";
+  if (/read[- ]?only|viewing/i.test(m)) return "The document is in view-only mode. Switch to Editing or Suggesting first.";
+  return m || "The editor couldn't apply that change.";
+}
+
+/** SuperDoc Document API adapter: literal case-sensitive query.match targets and checked receipts, always tracked. */
+function wordEngine(d: DocApi): WordEngine {
+  return {
+    match: async (text) => {
+      const r = (await d.query.match({
+        select: { type: "text", pattern: text, mode: "contains", caseSensitive: true },
+        limit: 2,
+      } as never)) as { total?: number; items?: { target?: MatchTarget }[] };
+      return { total: r?.total ?? r?.items?.length ?? 0, target: r?.items?.[0]?.target ?? null };
+    },
+    selection: async () => {
+      const s = (await d.selection.current({ includeText: true } as never)) as
+        | { empty?: boolean; text?: string; target?: MatchTarget | null; selectionTarget?: MatchTarget | null }
+        | undefined;
+      if (!s || s.empty) return { text: "", target: (s?.selectionTarget ?? s?.target) ?? null };
+      return { text: s.text ?? "", target: s.selectionTarget ?? s.target ?? null };
+    },
+    replace: async (target, text) => receipt(await d.replace({ target, text } as never, TRACKED as never)),
+    insertAt: async (target, text) => receipt(await d.insert({ target, value: text, type: "text" } as never, TRACKED as never)),
+  };
+}
 
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -202,93 +244,46 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
         const d = doc();
         if (!d) return { ok: false, reason: "The document isn't open yet." };
         if (modeRef.current === "viewing")
-          return {
-            ok: false,
-            reason: "Switch to Editing or Suggesting first — the document is in view-only mode.",
-          };
-        // AI text always lands as a tracked change so the attorney reviews a redline, never silent edits.
-        const opts = { changeMode: "tracked" as const };
-        const check = (receipt: unknown) => {
-          const r = receipt as { success?: boolean; failure?: { message?: string } } | undefined;
-          if (r && r.success === false)
-            throw new Error(r.failure?.message || "The editor declined the change.");
-        };
-        const plain = (e: unknown) => {
-          const m = e instanceof Error ? e.message : "";
-          if (/no change/i.test(m))
-            return "The proposal is identical to the text it would replace — nothing to change.";
-          if (/read[- ]?only|viewing/i.test(m))
-            return "The document is in view-only mode. Switch to Editing or Suggesting first.";
-          return m || "The editor couldn't apply that change.";
-        };
+          return { ok: false, reason: "Switch to Editing or Suggesting first — the document is in view-only mode." };
+        const eng = wordEngine(d);
         try {
-          const s = await d.selection.current({ includeText: true } as never);
-          const live = s && !s.empty ? (s.selectionTarget ?? s.target ?? null) : null;
           if (how === "replace") {
-            if (live) {
-              check(await d.replace({ target: live, text } as never, opts as never));
-              onDirty();
-              return { ok: true, tracked: true, how: "replace" };
-            }
-            // The selection was lost while the attorney worked in the panel: find the anchored passage again.
-            const needle = anchor?.trim();
-            if (!needle)
-              return { ok: false, reason: "Select the passage to replace in the document first." };
-            const found = (await d.find({
-              select: { type: "text", pattern: needle, caseSensitive: true },
-              limit: 2,
-            } as never)) as
-              | { total?: number; items?: { context?: { ancestors?: { id?: string }[] } }[] }
-              | undefined;
-            const refs = (found?.items ?? [])
-              .map(
-                (it) =>
-                  it.context?.ancestors?.find((a) => String(a.id ?? "").startsWith("v2-text:"))?.id,
-              )
-              .filter((x): x is string => typeof x === "string");
-            if (refs.length === 0)
-              return {
-                ok: false,
-                reason:
-                  "The passage you selected earlier is no longer in the document. Select the text to replace and try again.",
-              };
-            if ((found?.total ?? refs.length) > 1)
-              return {
-                ok: false,
-                reason:
-                  "That passage appears more than once. Select the exact one to replace in the document.",
-              };
-            check(await d.replace({ ref: refs[0], text } as never, opts as never));
+            // The target is the passage captured when the attorney asked — never whatever is selected now.
+            const t = await resolveReplaceTarget(eng, anchor);
+            if ("reason" in t) return { ok: false, reason: t.reason };
+            const r = await eng.replace(t.target, text);
+            if (!r.success) return { ok: false, reason: r.message ?? "The editor declined the change." };
             onDirty();
-            return {
-              ok: true,
-              tracked: true,
-              how: "replace",
-              detail: "Replaced the passage you selected when you asked.",
-            };
+            return { ok: true, tracked: true, how: "replace", detail: "Replaced the passage you selected when you asked." };
           }
-          let target = (s?.selectionTarget ?? s?.target ?? null) as {
-            kind?: string;
-            start?: unknown;
-            end?: unknown;
-          } | null;
-          if (target && !s?.empty && target.kind === "selection" && target.end) {
-            // "Insert" with text highlighted means insert after it, never over it: collapse to the end.
-            target = { ...target, start: target.end };
-          }
-          if (target) {
-            check(await d.insert({ target, value: text, type: "text" } as never, opts as never));
-          } else {
-            check(await d.insert({ value: text, type: "text" } as never, opts as never));
-          }
+          const s = await eng.selection();
+          let target = s.target;
+          // "Insert" with text highlighted inserts after it, never over it.
+          if (target && s.text && target.end) target = { ...target, start: target.end };
+          const r = target
+            ? await eng.insertAt(target, text)
+            : receipt(await d.insert({ value: text, type: "text" } as never, TRACKED as never));
+          if (!r.success) return { ok: false, reason: r.message ?? "The editor declined the change." };
           onDirty();
           return { ok: true, tracked: true, how: "cursor" };
         } catch (e) {
-          logClientError(e, "office", {
-            kind: "docx",
-            stage: how === "replace" ? "replace" : "insert",
-          });
-          return { ok: false, reason: plain(e) };
+          logClientError(e, "office", { kind: "docx", stage: how === "replace" ? "replace" : "insert" });
+          return { ok: false, reason: plainError(e) };
+        }
+      },
+      applyProposal: async (p) => {
+        const d = doc();
+        if (!d) return { ok: false, reason: "The document isn't open yet.", applied: 0 };
+        if (p.kind !== "word") return { ok: false, reason: "That proposal is for a spreadsheet.", applied: 0 };
+        if (modeRef.current === "viewing")
+          return { ok: false, reason: "Switch to Editing or Suggesting first — the document is in view-only mode.", applied: 0 };
+        try {
+          const r = await applyWordEdits(wordEngine(d), p.edits);
+          if (r.applied) onDirty();
+          return r;
+        } catch (e) {
+          logClientError(e, "office", { kind: "docx", stage: "apply-proposal" });
+          return { ok: false, reason: plainError(e), applied: 0 };
         }
       },
       export: async () => {

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 // Streaming per-matter Assist. Same rules as the server functions in src/lib/ai.functions.ts:
 // bearer-verified caller, matter context only, every run logged to ai_runs.
+// mode "draft" is handled by src/lib/office-stream.server.ts (bounded tool loop).
 // Wire format: newline-delimited JSON events — {t:"delta",text} | {t:"done",usage,runId} | {t:"error",message,retryable}
 
 const bodyZ = z.object({
@@ -20,9 +21,34 @@ const bodyZ = z.object({
     .object({
       name: z.string().max(300),
       kind: z.enum(["docx", "pdf", "xlsx", "text"]),
-      text: z.string().max(200_000),
+      text: z.string().max(400_000),
       selection: z.string().max(20_000).optional(),
+      workbook: z
+        .object({
+          active: z.string().max(200).optional(),
+          selection: z.object({ sheet: z.string().max(200), range: z.string().max(40) }).optional(),
+          sheets: z
+            .array(
+              z.object({
+                name: z.string().max(200),
+                cells: z.record(
+                  z.string().max(12),
+                  z.object({
+                    v: z.union([z.string().max(32_767), z.number(), z.boolean(), z.null()]).optional(),
+                    f: z.string().max(8_192).optional(),
+                  }),
+                ),
+              }),
+            )
+            .max(50),
+        })
+        .optional(),
     })
+    .optional(),
+  /** Reference documents attached in the drafting panel for this request only (extracted in the browser). */
+  attachments: z
+    .array(z.object({ id: z.string().max(64), name: z.string().max(300), text: z.string().max(200_000), truncated: z.boolean() }))
+    .max(5)
     .optional(),
 });
 
@@ -34,7 +60,7 @@ export const Route = createFileRoute("/api/assist")({
     handlers: {
       POST: async ({ request }) => {
         const { authFromRequest } = await import("@/lib/auth.server");
-        const { aiStream, matterContext, askInstructions, draftInstructions, logRun, toAiError, matterSources, queriesFromText } =
+        const { aiStream, matterContext, askInstructions, logRun, toAiError, matterSources, queriesFromText } =
           await import("@/lib/ai.server");
 
         const auth = await authFromRequest(request).catch(() => null);
@@ -44,11 +70,15 @@ export const Route = createFileRoute("/api/assist")({
         if (!parsed.success) return Response.json({ message: "Invalid request." }, { status: 400 });
         const { matterId, effort, question, history, runId, document: doc } = parsed.data;
         const mode = parsed.data.mode ?? "assist";
+        if (mode === "draft") {
+          const { draftResponse } = await import("@/lib/office-stream.server");
+          return draftResponse({ auth, body: parsed.data, request });
+        }
 
         let ctx: string;
         try {
           // In draft mode the open document carries the text; other files are listed by name only.
-          ctx = await matterContext(auth.supabase, matterId, effort, mode === "assist" && effort === "advanced");
+          ctx = await matterContext(auth.supabase, matterId, effort, effort === "advanced");
         } catch (e) {
           return Response.json(
             { message: e instanceof Error ? e.message : "Matter not found" },
@@ -90,7 +120,7 @@ export const Route = createFileRoute("/api/assist")({
         try {
           stream = aiStream(
             effort,
-            mode === "draft" ? draftInstructions(effort, doc?.kind ?? "docx") : askInstructions(effort),
+            askInstructions(effort),
             `${ctx}${docBlock}\n\n${sources.block}\n\nATTORNEY REQUEST:\n${question}`,
             {
               ...(history ? { history } : {}),
@@ -136,7 +166,7 @@ export const Route = createFileRoute("/api/assist")({
                 inputTokens: usage.inputTokens ?? undefined,
                 outputTokens: usage.outputTokens ?? undefined,
               };
-              await logRun(auth.supabase, auth.userId, matterId, mode === "draft" ? "draft" : "ask", effort, u);
+              await logRun(auth.supabase, auth.userId, matterId, "ask", effort, u);
               send({ t: "done", usage: u, runId: getRunId() ?? null });
             } catch (e) {
               const err = toAiError(e);
