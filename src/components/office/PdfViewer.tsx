@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import type { EditorHandle } from "./DocxEditor";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logClientError } from "@/lib/error-log";
 
 type Registry = {
   getPlugin: (id: string) => { provides: () => unknown } | null | undefined;
@@ -47,7 +48,7 @@ export function PdfViewer({ blob, name, text, author, dark, onDirty, onReady, on
         const { PDFViewer } = await import("@embedpdf/react-pdf-viewer");
         if (!disposed) setViewer(() => PDFViewer);
       } catch (e) {
-        console.error("[office:pdf:init]", e);
+        logClientError(e, "office", { kind: "pdf", stage: "open" });
         if (!disposed) setFailed(e instanceof Error ? e.message : "The PDF viewer couldn't start.");
       }
     })();

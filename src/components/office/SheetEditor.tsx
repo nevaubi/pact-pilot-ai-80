@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import type { EditorHandle } from "./DocxEditor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { workbookDataText, workbookToXlsx, xlsxToWorkbook, type WorkbookData } from "@/lib/office";
+import { logClientError } from "@/lib/error-log";
 
 type Props = {
   blob: Blob;
@@ -110,7 +111,7 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
         setReady(true);
         onReady?.();
       } catch (e) {
-        console.error("[office:xlsx:init]", e);
+        logClientError(e, "office", { kind: "xlsx", stage: "open" });
         const msg = e instanceof Error ? e.message : "The spreadsheet couldn't open.";
         if (!disposed) {
           setFailed(msg);
@@ -191,7 +192,7 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
           const skipped = missing.length ? ` Skipped ${missing.length} on an unknown sheet.` : "";
           return { ok: true, tracked: false, how: "cells", detail: `Updated ${list}.${skipped} Review them, then save.` };
         } catch (e) {
-          console.error("[office:xlsx:insert]", e);
+          logClientError(e, "office", { kind: "xlsx", stage: "apply-cells" });
           return { ok: false, reason: e instanceof Error ? e.message : "The spreadsheet couldn't apply that change." };
         }
       },

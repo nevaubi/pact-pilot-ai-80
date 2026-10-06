@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import type { SuperDoc as SuperDocType } from "superdoc";
 import "superdoc/style.css";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logClientError } from "@/lib/error-log";
 
 export type DocMode = "editing" | "suggesting" | "viewing";
 
@@ -106,7 +107,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           onException: (p: unknown) => {
             const e = (p as { error?: unknown } | undefined)?.error;
             const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "The document editor reported a problem.";
-            console.error("[office:docx]", p);
+            logClientError(e instanceof Error ? e : new Error(msg), "office", { kind: "docx", stage: "editor" });
             onError?.(msg);
           },
           onContentError: () => {
@@ -125,7 +126,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           }
         }, 500);
       } catch (e) {
-        console.error("[office:docx:init]", e);
+        logClientError(e, "office", { kind: "docx", stage: "open" });
         if (!disposed) setFailed(e instanceof Error ? e.message : "The editor couldn't start.");
       }
     })();
@@ -234,7 +235,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           onDirty();
           return { ok: true, tracked: true, how: "cursor" };
         } catch (e) {
-          console.error("[office:docx:insert]", e);
+          logClientError(e, "office", { kind: "docx", stage: how === "replace" ? "replace" : "insert" });
           return { ok: false, reason: plain(e) };
         }
       },
