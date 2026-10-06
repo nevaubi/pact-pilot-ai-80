@@ -19,6 +19,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedTodayRouteImport } from './routes/_authenticated/today'
 import { Route as ApiAssistRouteImport } from './routes/api/assist'
+import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as DevOfficeHarnessRouteImport } from './routes/dev.office-harness'
 import { Route as AuthenticatedMattersIndexRouteImport } from './routes/_authenticated/matters.index'
 import { Route as AuthenticatedMattersIdRouteImport } from './routes/_authenticated/matters.$id'
@@ -73,6 +74,11 @@ const ApiAssistRoute = ApiAssistRouteImport.update({
   path: '/api/assist',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DevOfficeHarnessRoute = DevOfficeHarnessRouteImport.update({
   id: '/dev/office-harness',
   path: '/dev/office-harness',
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/templates': typeof AuthenticatedTemplatesRoute
   '/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/dev/office-harness': typeof DevOfficeHarnessRoute
   '/matters/$id': typeof AuthenticatedMattersIdRoute
   '/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/templates': typeof AuthenticatedTemplatesRoute
   '/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/dev/office-harness': typeof DevOfficeHarnessRoute
   '/matters/$id': typeof AuthenticatedMattersIdRoute
   '/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/today': typeof AuthenticatedTodayRoute
   '/api/assist': typeof ApiAssistRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/dev/office-harness': typeof DevOfficeHarnessRoute
   '/_authenticated/matters/$id': typeof AuthenticatedMattersIdRoute
   '/_authenticated/office/$fileId': typeof AuthenticatedOfficeFileIdRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/today'
     | '/api/assist'
+    | '/api/transcribe'
     | '/dev/office-harness'
     | '/matters/$id'
     | '/office/$fileId'
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/templates'
     | '/today'
     | '/api/assist'
+    | '/api/transcribe'
     | '/dev/office-harness'
     | '/matters/$id'
     | '/office/$fileId'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/_authenticated/templates'
     | '/_authenticated/today'
     | '/api/assist'
+    | '/api/transcribe'
     | '/dev/office-harness'
     | '/_authenticated/matters/$id'
     | '/_authenticated/office/$fileId'
@@ -197,6 +209,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiAssistRoute: typeof ApiAssistRoute
+  ApiTranscribeRoute: typeof ApiTranscribeRoute
   DevOfficeHarnessRoute: typeof DevOfficeHarnessRoute
 }
 
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dev/office-harness': {
       id: '/dev/office-harness'
       path: '/dev/office-harness'
@@ -335,6 +355,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiAssistRoute: ApiAssistRoute,
+  ApiTranscribeRoute: ApiTranscribeRoute,
   DevOfficeHarnessRoute: DevOfficeHarnessRoute,
 }
 export const routeTree = rootRouteImport
