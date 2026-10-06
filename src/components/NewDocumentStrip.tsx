@@ -56,16 +56,18 @@ export function NewDocumentStrip({ matterId }: { matterId?: string }) {
   async function create() {
     if (!kind || busy) return;
     setBusy(true);
-    const row = await tryAction(async () => {
+    let row: { id: string } | null = null;
+    await tryAction(async () => {
       const { createBlankFile } = await import("@/lib/blank-files");
-      return createBlankFile(kind, name, matter || null);
+      row = await createBlankFile(kind, name, matter || null);
     }, "Couldn't create the document");
     setBusy(false);
-    if (!row) return;
+    const created = row as { id: string } | null;
+    if (!created) return;
     qc.invalidateQueries({ queryKey: ["files-hub"] });
     if (matter) qc.invalidateQueries({ queryKey: ["files", matter] });
     setKind(null);
-    nav({ to: "/office/$fileId", params: { fileId: row.id } });
+    nav({ to: "/office/$fileId", params: { fileId: created.id } });
   }
 
   return (
