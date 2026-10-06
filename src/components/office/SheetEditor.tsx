@@ -187,6 +187,8 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
   /** Original package bytes and the workbook as imported from them: saves patch only the difference. */
   const origRef = useRef<ArrayBuffer | null>(null);
   const baseRef = useRef<WorkbookData | null>(null);
+  /** Snapshot taken at the last export: becomes the baseline if that export is saved. */
+  const exportedRef = useRef<WorkbookData | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -331,14 +333,15 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
         const base = baseRef.current;
         if (!orig || !base) throw new Error("The original workbook isn't loaded.");
         const { diffWorkbooks, patchXlsx } = await import("@/lib/xlsx-package");
-        const changes = diffWorkbooks(base, snapshotOf(wb));
+        const now = structuredClone(snapshotOf(wb));
+        exportedRef.current = now;
+        const changes = diffWorkbooks(base, now);
         // No cell changed: the exact original bytes, never a rebuilt workbook.
         if (!changes.length) return new Blob([orig], { type: MIME.xlsx });
         return patchXlsx(orig, changes);
       },
       markSaved: (saved) => {
-        const wb = apiRef.current?.getActiveWorkbook();
-        const snap = wb ? structuredClone(snapshotOf(wb)) : null;
+        const snap = exportedRef.current;
         void saved.arrayBuffer().then((b) => {
           origRef.current = b;
           if (snap) baseRef.current = snap;
