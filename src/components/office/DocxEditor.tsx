@@ -47,6 +47,7 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
   const [failed, setFailed] = useState<string | null>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
+  const readyRef = useRef(false);
 
   useEffect(() => {
     let disposed = false;
@@ -68,11 +69,15 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
           uiDisplayFallbackFont: '"Figtree", "Inter", system-ui, sans-serif',
           onReady: () => {
             if (disposed) return;
+            // Load-time transactions fire editor updates; only count edits after the document settled.
+            setTimeout(() => {
+              readyRef.current = true;
+            }, 400);
             setReady(true);
             onReady?.();
           },
           onEditorUpdate: () => {
-            if (!disposed) onDirty();
+            if (!disposed && readyRef.current) onDirty();
           },
           onException: (p: { error?: unknown } & Record<string, unknown>) => {
             const e = p?.error;
