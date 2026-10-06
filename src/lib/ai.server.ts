@@ -348,6 +348,71 @@ export async function logRun(
 
 export function askInstructions(effort: Effort) {
   return effort === "advanced"
-    ? "Advanced effort: analyze carefully, flag issues and risks, and cite which part of the matter or document supports each point. End with a short 'For your review:' list naming what the attorney should check personally."
-    : "Normal effort: practical case-management help. Keep it short and concrete. End with one line 'For your review:' naming what to double-check.";
+    ? "Advanced effort: analyze carefully, flag issues and risks, and cite which part of the matter or document supports each point. When SOURCES are provided, ground legal points in them: cite the tag like [S2] right after the sentence and quote the operative words. Never cite a tag that was not provided and never state a rule you cannot support from the sources or the matter. End with a short 'For your review:' list naming what the attorney should check personally."
+    : "Normal effort: practical case-management help. Keep it short and concrete. When SOURCES are provided and relevant, cite the tag like [S1] after the sentence; do not invent citations. End with one line 'For your review:' naming what to double-check.";
+}
+
+// ---------- law-library grounding ----------
+
+export type SourceMeta = { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null };
+
+export async function pinnedAuthorityIds(supabase: DB, matterId: string) {
+  const { data } = await supabase.from("matter_authorities").select("authority_id").eq("matter_id", matterId);
+  return (data ?? []).map((r) => r.authority_id);
+}
+
+const SOURCE_BUDGET: Record<Effort, number> = { normal: 9_000, advanced: 26_000 };
+
+/**
+ * Library passages for a matter question: pinned sources first (they are the attorney's chosen
+ * authorities), then the practice area's topic. Returns the prompt block plus metadata for the UI.
+ */
+export async function matterSources(
+  supabase: DB,
+  matterId: string,
+  practiceArea: string,
+  queries: string[],
+  effort: Effort,
+  budget = SOURCE_BUDGET[effort],
+) {
+  const { libraryPassages, renderPassages } = await import("./library.server");
+  const topicByPractice: Record<string, string> = {
+    "Real Estate": "real_estate",
+    Corporate: "entity",
+    "Estate Planning": "estate_planning",
+    Finance: "finance",
+    Compliance: "compliance",
+  };
+  const pinned = await pinnedAuthorityIds(supabase, matterId);
+  const qs = queries.map((q) => q.trim()).filter((q) => q.length >= 3).slice(0, 10);
+  let passages = pinned.length ? await libraryPassages(supabase, qs, { ids: pinned, charBudget: Math.round(budget * 0.6), perQuery: 4 }) : [];
+  const remaining = budget - passages.reduce((n, p) => n + p.body.length, 0);
+  if (remaining > 1500) {
+    const topic = topicByPractice[practiceArea];
+    const more = await libraryPassages(supabase, qs, { ...(topic ? { topic } : {}), charBudget: remaining, perQuery: 4 });
+    const seen = new Set(passages.map((p) => `${p.authority_id}:${p.heading ?? ""}:${p.body.slice(0, 40)}`));
+    for (const p of more) {
+      const k = `${p.authority_id}:${p.heading ?? ""}:${p.body.slice(0, 40)}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      passages.push({ ...p, ref: `S${passages.length + 1}` });
+    }
+  }
+  passages = passages.map((p, i) => ({ ...p, ref: `S${i + 1}` }));
+  const meta: SourceMeta[] = passages.map((p) => ({ ref: p.ref, authority_id: p.authority_id, citation: p.citation, title: p.title, url: p.url, version: p.version }));
+  return { block: renderPassages(passages), passages, meta };
+}
+
+/** Turn a free-text question into a few search queries (cheap heuristics, no AI call). */
+export function queriesFromText(text: string, extra: string[] = []) {
+  const stop = new Set("the a an and or of to in on for with by from at as is are be this that it its our their we you they what how when which who does do did can should would could will about into than then there here also any all some such per".split(" "));
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9§.\-\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !stop.has(w));
+  const uniq = [...new Set(words)];
+  const main = uniq.slice(0, 8).join(" ");
+  const cites = [...text.matchAll(/\b\d+\s?(?:CFR|U\.?S\.?C\.?|ILCS)\s?§?\s?[\d.()a-z-]+/gi)].map((m) => m[0]);
+  return [...cites, main, ...extra].filter(Boolean).slice(0, 8);
 }
