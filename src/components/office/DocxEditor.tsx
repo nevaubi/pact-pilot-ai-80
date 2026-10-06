@@ -91,7 +91,9 @@ export function DocxEditor({ blob, name, user, mode, onDirty, onReady, onError, 
             toolbar: { container: toolbarRef.current, responsiveTo: "container", overflow: "menu" },
             loading: false,
             search: true,
-            comments: true,
+            // Measure the editor pane, not the window: with the drafting panel open the sidebar
+            // bubbles would be clipped, so comments fall back to the inline layout.
+            comments: { layout: "auto", responsive: { target: hostRef.current, breakpoint: 1180 } },
             contextMenu: true,
           },
           telemetry: { enabled: false },
