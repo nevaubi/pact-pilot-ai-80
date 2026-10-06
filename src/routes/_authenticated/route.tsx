@@ -32,28 +32,28 @@ function Shell() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const item = (active: boolean) =>
-    `flex min-w-[44px] flex-col items-center gap-1 rounded-xl px-1.5 py-2 text-[10px] font-medium transition-colors sm:min-w-[56px] sm:px-2 ${
+    `flex min-w-11 flex-col items-center gap-1 rounded px-1 py-1.5 text-[10px] font-medium transition-colors md:w-14 ${
       active
-        ? "bg-card text-primary shadow-sm"
-        : "text-muted-foreground hover:bg-card/60 hover:text-foreground"
+        ? "bg-primary/8 text-primary"
+        : "text-muted-foreground hover:bg-raised hover:text-foreground"
     }`;
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="sticky top-0 z-20 flex shrink-0 items-center gap-1 border-b bg-rail px-2 py-2 md:h-screen md:w-[76px] md:flex-col md:border-b-0 md:border-r md:py-4">
-        <Link to="/today" className="mb-0 mr-1 md:mb-4 md:mr-0" aria-label="Mirza home">
-          <LogoMark className="h-9 w-9" />
+    <div className="flex min-h-screen flex-col bg-background md:flex-row">
+      <aside className="sticky top-0 z-20 flex shrink-0 items-center gap-1 border-b bg-rail px-2 py-2 md:h-screen md:w-16 md:flex-col md:border-b-0 md:border-r md:px-1 md:py-4">
+        <Link to="/today" className="mb-0 mr-1 md:mb-5 md:mr-0" aria-label="Mirza home">
+          <LogoMark className="h-8 w-8 rounded" />
         </Link>
         <nav className="flex flex-1 gap-0.5 sm:gap-1 md:flex-col" aria-label="Main">
           {NAV.map((n) => (
             <Link key={n.to} to={n.to} className={item(path.startsWith(n.to))} aria-label={n.label}>
-              <n.icon className="h-5 w-5" strokeWidth={1.75} />
+              <n.icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
               <span className="hidden sm:inline">{n.label}</span>
             </Link>
           ))}
         </nav>
         <div className="flex gap-0.5 sm:gap-1 md:flex-col">
           <Link to="/settings" className={item(path.startsWith("/settings"))} aria-label="Settings">
-            <Settings className="h-5 w-5" strokeWidth={1.75} />
+            <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
             <span className="hidden sm:inline">Settings</span>
           </Link>
           <button
@@ -64,7 +64,7 @@ function Shell() {
             className={item(false)}
             aria-label="Sign out"
           >
-            <LogOut className="h-5 w-5" strokeWidth={1.75} />
+            <LogOut className="h-[18px] w-[18px]" strokeWidth={1.8} />
             <span className="hidden sm:inline">Sign out</span>
           </button>
         </div>
