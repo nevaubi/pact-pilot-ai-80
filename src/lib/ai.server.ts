@@ -366,6 +366,25 @@ export function askInstructions(effort: Effort) {
     : "Normal effort: practical case-management help. Keep it short and concrete. When SOURCES are provided and relevant, cite the tag like [S1] after the sentence; do not invent citations. End with one line 'For your review:' naming what to double-check.";
 }
 
+/**
+ * Drafting assistant inside the Office editors. The attorney has a document open; the model
+ * proposes text the attorney inserts or replaces by hand (tracked changes), so output must be
+ * clean, insertable prose in the document's own voice.
+ */
+export function draftInstructions(effort: Effort, kind: "docx" | "pdf" | "xlsx" | "text") {
+  const common = `You are working alongside the attorney inside an open ${kind === "xlsx" ? "spreadsheet" : kind === "pdf" ? "PDF" : "document"} (OPEN DOCUMENT below; SELECTION is the text the attorney has highlighted, if any).
+Drafting rules:
+- When asked to draft, rewrite, tighten or add language, answer with the proposed text itself inside a single fenced block marked \`\`\`draft so it can be inserted verbatim. Put any explanation outside the block, in one or two short lines.
+- Match the document's defined terms, numbering, tense, party names and tone exactly. Reuse the firm's wording from the open document and house templates rather than inventing new styles.
+- Never invent facts, dates, amounts or party details. Where a fact is unknown, leave a blank in the form [[Field Name]].
+- Keep proposals as small as the request allows: a clause, a sentence, a paragraph — not a rewrite of the whole document unless asked.
+- When SOURCES are provided and a point of law matters, cite the tag like [S1] after the sentence (outside the draft block) and quote the operative words; never cite a tag that was not provided.
+- For questions (not drafting), answer plainly from the open document and the matter; quote the passage you rely on.`;
+  const sheet = kind === "xlsx" ? `\n- For spreadsheet work, put proposed cell values or formulas inside the draft block one per line as A1-style references, e.g. \`B12 = =SUM(B2:B11)\`; show the reasoning outside the block.` : "";
+  const effortLine = effort === "advanced" ? "\nAdvanced effort: check the proposal against the rest of the document for conflicts (defined terms, cross-references, inconsistent dates or amounts) and list anything the attorney should reconcile under 'For your review:'." : "\nNormal effort: be quick and concrete; end with one line 'For your review:'.";
+  return common + sheet + effortLine;
+}
+
 // ---------- law-library grounding ----------
 
 export type SourceMeta = { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null };
