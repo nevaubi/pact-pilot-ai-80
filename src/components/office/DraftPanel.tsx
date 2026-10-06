@@ -7,6 +7,7 @@ import { linkCitations, useAssist, type DocContext, type Turn } from "@/hooks/us
 import { EffortToggle, UsageNote, ReviewBanner } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { copyText } from "@/lib/clipboard";
 import type { EditorHandle } from "./DocxEditor";
 
 type Props = {
@@ -173,7 +174,7 @@ export function DraftPanel({ matterId, fileId, kind, canInsert, getDoc, editor }
                 <div className="flex flex-wrap items-center gap-1">
                   <UsageNote effort={t.effort} usage={t.usage} />
                   <span className="flex-1" />
-                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => navigator.clipboard.writeText(insertable).then(() => toast.success(proposal ? "Proposed text copied" : "Copied"))}>
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => copyText(insertable, proposal ? "Proposed text copied" : "Copied")}>
                     <Copy className="mr-1 h-3 w-3" />Copy
                   </Button>
                   {canInsert && kind === "xlsx" && (

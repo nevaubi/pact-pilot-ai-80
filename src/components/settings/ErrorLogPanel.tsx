@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, ChevronDown, ChevronRight } from "lucide-react";
-import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Panel, ListState, Confirm } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { mut, tryAction } from "@/lib/mutate";
+import { copyText } from "@/lib/clipboard";
 
 const SOURCE_LABEL: Record<string, string> = {
   boundary: "Page crashed",
@@ -123,7 +123,7 @@ export function ErrorLogPanel() {
                         size="sm"
                         variant="outline"
                         className="h-6 text-xs"
-                        onClick={() => navigator.clipboard.writeText(details(r)).then(() => toast.success("Details copied — paste them into a support message."))}
+                        onClick={() => copyText(details(r), "Details copied — paste them into a support message.")}
                       >
                         <Copy className="mr-1 h-3 w-3" />Copy details
                       </Button>
