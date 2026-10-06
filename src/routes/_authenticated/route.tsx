@@ -6,7 +6,7 @@ import {
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
-import { Briefcase, CalendarCheck, Users, Files, FileText, Settings, LogOut } from "lucide-react";
+import { Briefcase, CalendarCheck, Users, Files, FileText, Settings, LogOut, Scale } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { LogoMark } from "@/components/LogoMark";
 
@@ -26,6 +26,7 @@ const NAV = [
   { to: "/contacts", label: "Contacts", icon: Users },
   { to: "/files", label: "Files", icon: Files },
   { to: "/templates", label: "Templates", icon: FileText },
+  { to: "/library", label: "Library", icon: Scale },
 ] as const;
 
 function Shell() {

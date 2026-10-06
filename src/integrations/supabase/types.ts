@@ -87,6 +87,181 @@ export type Database = {
           },
         ]
       }
+      authorities: {
+        Row: {
+          added_by: string | null
+          checked_at: string | null
+          citation: string
+          content_hash: string | null
+          created_at: string
+          error: string | null
+          fetch_url: string | null
+          fetched_at: string | null
+          id: string
+          is_catalog: boolean
+          jurisdiction: string
+          key: string | null
+          kind: string
+          meta: Json
+          mime: string | null
+          source: string
+          status: string
+          storage_path: string | null
+          summary: string | null
+          text: string | null
+          text_chars: number
+          title: string
+          topics: string[]
+          updated_at: string
+          url: string
+          version_label: string | null
+        }
+        Insert: {
+          added_by?: string | null
+          checked_at?: string | null
+          citation: string
+          content_hash?: string | null
+          created_at?: string
+          error?: string | null
+          fetch_url?: string | null
+          fetched_at?: string | null
+          id?: string
+          is_catalog?: boolean
+          jurisdiction?: string
+          key?: string | null
+          kind?: string
+          meta?: Json
+          mime?: string | null
+          source?: string
+          status?: string
+          storage_path?: string | null
+          summary?: string | null
+          text?: string | null
+          text_chars?: number
+          title: string
+          topics?: string[]
+          updated_at?: string
+          url: string
+          version_label?: string | null
+        }
+        Update: {
+          added_by?: string | null
+          checked_at?: string | null
+          citation?: string
+          content_hash?: string | null
+          created_at?: string
+          error?: string | null
+          fetch_url?: string | null
+          fetched_at?: string | null
+          id?: string
+          is_catalog?: boolean
+          jurisdiction?: string
+          key?: string | null
+          kind?: string
+          meta?: Json
+          mime?: string | null
+          source?: string
+          status?: string
+          storage_path?: string | null
+          summary?: string | null
+          text?: string | null
+          text_chars?: number
+          title?: string
+          topics?: string[]
+          updated_at?: string
+          url?: string
+          version_label?: string | null
+        }
+        Relationships: []
+      }
+      authority_chunks: {
+        Row: {
+          authority_id: string
+          body: string
+          heading: string | null
+          id: number
+          idx: number
+          tsv: unknown
+        }
+        Insert: {
+          authority_id: string
+          body: string
+          heading?: string | null
+          id?: never
+          idx: number
+          tsv?: unknown
+        }
+        Update: {
+          authority_id?: string
+          body?: string
+          heading?: string | null
+          id?: never
+          idx?: number
+          tsv?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "authority_chunks_authority_id_fkey"
+            columns: ["authority_id"]
+            isOneToOne: false
+            referencedRelation: "authorities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      authority_updates: {
+        Row: {
+          abstract: string | null
+          agency: string | null
+          authority_id: string
+          created_at: string
+          doc_type: string | null
+          document_number: string
+          effective_on: string | null
+          html_url: string | null
+          id: string
+          pdf_url: string | null
+          publication_date: string | null
+          title: string
+        }
+        Insert: {
+          abstract?: string | null
+          agency?: string | null
+          authority_id: string
+          created_at?: string
+          doc_type?: string | null
+          document_number: string
+          effective_on?: string | null
+          html_url?: string | null
+          id?: string
+          pdf_url?: string | null
+          publication_date?: string | null
+          title: string
+        }
+        Update: {
+          abstract?: string | null
+          agency?: string | null
+          authority_id?: string
+          created_at?: string
+          doc_type?: string | null
+          document_number?: string
+          effective_on?: string | null
+          html_url?: string | null
+          id?: string
+          pdf_url?: string | null
+          publication_date?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "authority_updates_authority_id_fkey"
+            columns: ["authority_id"]
+            isOneToOne: false
+            referencedRelation: "authorities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       closing_items: {
         Row: {
           created_at: string
@@ -250,6 +425,7 @@ export type Database = {
       files: {
         Row: {
           created_at: string
+          doc_type: string | null
           extracted_text: string | null
           id: string
           matter_id: string | null
@@ -259,6 +435,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          doc_type?: string | null
           extracted_text?: string | null
           id?: string
           matter_id?: string | null
@@ -268,6 +445,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          doc_type?: string | null
           extracted_text?: string | null
           id?: string
           matter_id?: string | null
@@ -278,6 +456,45 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "files_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matter_authorities: {
+        Row: {
+          authority_id: string
+          created_at: string
+          id: string
+          matter_id: string
+          note: string | null
+        }
+        Insert: {
+          authority_id: string
+          created_at?: string
+          id?: string
+          matter_id: string
+          note?: string | null
+        }
+        Update: {
+          authority_id?: string
+          created_at?: string
+          id?: string
+          matter_id?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matter_authorities_authority_id_fkey"
+            columns: ["authority_id"]
+            isOneToOne: false
+            referencedRelation: "authorities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matter_authorities_matter_id_fkey"
             columns: ["matter_id"]
             isOneToOne: false
             referencedRelation: "matters"
@@ -316,6 +533,110 @@ export type Database = {
             foreignKeyName: "matter_contacts_matter_id_fkey"
             columns: ["matter_id"]
             isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matter_properties: {
+        Row: {
+          acceptance_date: string | null
+          address: string | null
+          attorney_review_days: number
+          city: string | null
+          closing_date: string | null
+          county: string
+          earnest_days: number | null
+          earnest_money: number | null
+          flags: Json
+          in_chicago: boolean
+          inspection_days: number
+          last_tax_bill: number | null
+          lender: string | null
+          loan_amount: number | null
+          matter_id: string
+          notes: string | null
+          pin: string | null
+          prior_year_unpaid: number | null
+          property_type: string
+          proration_pct: number
+          purchase_price: number | null
+          side: string
+          state: string
+          survey_date: string | null
+          tax_year: number | null
+          title_company: string | null
+          updated_at: string
+          year_built: number | null
+          zip: string | null
+        }
+        Insert: {
+          acceptance_date?: string | null
+          address?: string | null
+          attorney_review_days?: number
+          city?: string | null
+          closing_date?: string | null
+          county?: string
+          earnest_days?: number | null
+          earnest_money?: number | null
+          flags?: Json
+          in_chicago?: boolean
+          inspection_days?: number
+          last_tax_bill?: number | null
+          lender?: string | null
+          loan_amount?: number | null
+          matter_id: string
+          notes?: string | null
+          pin?: string | null
+          prior_year_unpaid?: number | null
+          property_type?: string
+          proration_pct?: number
+          purchase_price?: number | null
+          side?: string
+          state?: string
+          survey_date?: string | null
+          tax_year?: number | null
+          title_company?: string | null
+          updated_at?: string
+          year_built?: number | null
+          zip?: string | null
+        }
+        Update: {
+          acceptance_date?: string | null
+          address?: string | null
+          attorney_review_days?: number
+          city?: string | null
+          closing_date?: string | null
+          county?: string
+          earnest_days?: number | null
+          earnest_money?: number | null
+          flags?: Json
+          in_chicago?: boolean
+          inspection_days?: number
+          last_tax_bill?: number | null
+          lender?: string | null
+          loan_amount?: number | null
+          matter_id?: string
+          notes?: string | null
+          pin?: string | null
+          prior_year_unpaid?: number | null
+          property_type?: string
+          proration_pct?: number
+          purchase_price?: number | null
+          side?: string
+          state?: string
+          survey_date?: string | null
+          tax_year?: number | null
+          title_company?: string | null
+          updated_at?: string
+          year_built?: number | null
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matter_properties_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: true
             referencedRelation: "matters"
             referencedColumns: ["id"]
           },
@@ -413,6 +734,62 @@ export type Database = {
         }
         Relationships: []
       }
+      reviews: {
+        Row: {
+          authority_ids: string[]
+          created_at: string
+          created_by: string | null
+          decisions: Json
+          effort: string
+          file_ids: string[]
+          id: string
+          input_tokens: number | null
+          kind: string
+          matter_id: string
+          output_tokens: number | null
+          result: Json
+          title: string
+        }
+        Insert: {
+          authority_ids?: string[]
+          created_at?: string
+          created_by?: string | null
+          decisions?: Json
+          effort?: string
+          file_ids?: string[]
+          id?: string
+          input_tokens?: number | null
+          kind: string
+          matter_id: string
+          output_tokens?: number | null
+          result?: Json
+          title: string
+        }
+        Update: {
+          authority_ids?: string[]
+          created_at?: string
+          created_by?: string | null
+          decisions?: Json
+          effort?: string
+          file_ids?: string[]
+          id?: string
+          input_tokens?: number | null
+          kind?: string
+          matter_id?: string
+          output_tokens?: number | null
+          result?: Json
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assignee: string | null
@@ -486,7 +863,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      search_authorities: {
+        Args: {
+          ids?: string[]
+          jur?: string
+          lim?: number
+          q: string
+          topic?: string
+        }
+        Returns: {
+          authority_id: string
+          body: string
+          chunk_idx: number
+          citation: string
+          heading: string
+          jurisdiction: string
+          rank: number
+          snippet: string
+          title: string
+          url: string
+          version_label: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

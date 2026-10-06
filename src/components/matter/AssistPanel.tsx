@@ -20,16 +20,31 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 type Usage = { inputTokens?: number | undefined; outputTokens?: number | undefined };
+type SourceMeta = { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null };
 type Turn = {
   id: string;
   q: string;
   a: string;
   effort: Effort;
   usage?: Usage | undefined;
+  sources?: SourceMeta[] | undefined;
   status: "streaming" | "done" | "stopped" | "error";
   error?: string | undefined;
   retryable?: boolean | undefined;
 };
+
+/** Turn [S2] tags into links to the cited source and list only the sources actually cited. */
+function linkCitations(text: string, sources: SourceMeta[] | undefined) {
+  if (!sources?.length) return { text, used: [] as SourceMeta[] };
+  const used = new Set<string>();
+  const out = text.replace(/\[(S\d+)\]/g, (all, ref: string) => {
+    const s = sources.find((x) => x.ref === ref);
+    if (!s) return all;
+    used.add(ref);
+    return `[${ref}](${s.url} "${s.citation}")`;
+  });
+  return { text: out, used: sources.filter((s) => used.has(s.ref)) };
+}
 
 const VERBS: Record<string, string[] | undefined> = {
   common: [
@@ -162,9 +177,11 @@ export function AssistPanel({
           if (!l.trim()) continue;
           const ev = JSON.parse(l) as
             | { t: "delta"; text: string }
+            | { t: "sources"; items: SourceMeta[] }
             | { t: "done"; usage: Usage; runId: string | null }
             | { t: "error"; message: string; retryable: boolean };
           if (ev.t === "delta") patch(id, (t) => ({ a: t.a + ev.text }));
+          else if (ev.t === "sources") patch(id, { sources: ev.items });
           else if (ev.t === "done") {
             patch(id, { status: "done", usage: ev.usage });
             if (ev.runId) runIdRef.current = ev.runId;
@@ -297,11 +314,7 @@ export function AssistPanel({
                       <span className="rounded bg-raised px-1.5 py-0.5">stopped early</span>
                     )}
                   </div>
-                  {t.a && (
-                    <div className="md text-sm">
-                      <ReactMarkdown>{t.a}</ReactMarkdown>
-                    </div>
-                  )}
+                  {t.a && <Answer text={t.a} sources={t.sources} />}
                   {t.status === "streaming" && (
                     <span
                       className="inline-block h-4 w-1.5 animate-pulse rounded-sm bg-ink-purple align-text-bottom"
@@ -407,6 +420,46 @@ export function AssistPanel({
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function Answer({ text, sources }: { text: string; sources: SourceMeta[] | undefined }) {
+  const { text: linked, used } = linkCitations(text, sources);
+  return (
+    <div className="space-y-2">
+      <div className="md text-sm">
+        <ReactMarkdown
+          components={{
+            a: ({ href, title, children }) => (
+              <a
+                href={href}
+                title={title}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-sm bg-ink-blue/10 px-1 align-baseline text-[11px] font-semibold text-ink-blue no-underline hover:bg-ink-blue/20"
+              >
+                {children}
+              </a>
+            ),
+          }}
+        >
+          {linked}
+        </ReactMarkdown>
+      </div>
+      {used.length > 0 && (
+        <ul className="space-y-0.5 rounded border bg-card px-2.5 py-1.5 text-[11px]">
+          {used.map((s) => (
+            <li key={s.ref} className="flex gap-1.5">
+              <span className="shrink-0 font-semibold text-ink-blue">{s.ref}</span>
+              <a href={s.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate hover:underline">
+                <span className="font-mono">{s.citation}</span> — {s.title}
+                {s.version ? <span className="text-muted-foreground"> · {s.version}</span> : null}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

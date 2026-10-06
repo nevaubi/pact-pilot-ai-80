@@ -75,6 +75,29 @@ export const templatesQ = queryOptions({
   queryKey: ["templates"],
   queryFn: () => q(supabase.from("templates").select("*").order("name")),
 });
+/** Persisted AI reviews (tax flags, title/survey review) for a matter, newest first. */
+export const reviewsQ = (matterId: string, kind: string) =>
+  queryOptions({
+    queryKey: ["reviews", matterId, kind],
+    queryFn: () =>
+      q(
+        supabase
+          .from("reviews")
+          .select("*")
+          .eq("matter_id", matterId)
+          .eq("kind", kind)
+          .order("created_at", { ascending: false })
+          .limit(20),
+      ),
+  });
+export const propertyQ = (matterId: string) =>
+  queryOptions({
+    queryKey: ["property", matterId],
+    queryFn: () =>
+      q<Tables<"matter_properties"> | null>(
+        supabase.from("matter_properties").select("*").eq("matter_id", matterId).maybeSingle(),
+      ),
+  });
 
 let actorCache: { id: string; name: string } | null = null;
 

@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/assist")({
     handlers: {
       POST: async ({ request }) => {
         const { authFromRequest } = await import("@/lib/auth.server");
-        const { aiStream, matterContext, askInstructions, logRun, toAiError } =
+        const { aiStream, matterContext, askInstructions, logRun, toAiError, matterSources, queriesFromText } =
           await import("@/lib/ai.server");
 
         const auth = await authFromRequest(request).catch(() => null);
@@ -40,6 +40,10 @@ export const Route = createFileRoute("/api/assist")({
             { status: 404 },
           );
         }
+        // Library grounding: pinned sources first, then the practice area's topic. Never fatal.
+        const sources = await matterSources(auth.supabase, matterId, undefined, queriesFromText(question), effort).catch(
+          () => ({ block: "", meta: [] as { ref: string; authority_id: string; citation: string; title: string; url: string; version: string | null }[] }),
+        );
 
         const enc = new TextEncoder();
         const line = (o: unknown) => enc.encode(JSON.stringify(o) + "\n");
@@ -57,7 +61,7 @@ export const Route = createFileRoute("/api/assist")({
           stream = aiStream(
             effort,
             askInstructions(effort),
-            `${ctx}\n\nATTORNEY REQUEST:\n${question}`,
+            `${ctx}\n\n${sources.block}\n\nATTORNEY REQUEST:\n${question}`,
             {
               ...(history ? { history } : {}),
               ...(runId ? { runId } : {}),
@@ -88,6 +92,7 @@ export const Route = createFileRoute("/api/assist")({
                 /* client went away */
               }
             };
+            if (sources.meta.length) send({ t: "sources", items: sources.meta });
             try {
               let cur = first;
               while (!cur.done) {
