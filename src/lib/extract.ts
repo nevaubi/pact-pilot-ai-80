@@ -61,6 +61,39 @@ export async function extractText(file: File, maxPages = 80): Promise<string> {
   return await file.text();
 }
 
+export type Extracted = { text: string; complete: boolean; note: string | null };
+
+/**
+ * Same extraction as `extractText`, but reports honestly when it read only part of the file (PDF
+ * page limit, workbook text cap) instead of silently truncating.
+ */
+export async function extractWithCoverage(file: File, maxPages = 80): Promise<Extracted> {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) {
+    polyfillSumPrecise();
+    const pdfjs = await import("pdfjs-dist");
+    const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
+    pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const total = doc.numPages;
+    await doc.cleanup?.();
+    const text = await extractText(file, maxPages);
+    return total > maxPages
+      ? { text, complete: false, note: `first ${maxPages} of ${total} pages` }
+      : { text, complete: true, note: null };
+  }
+  if (name.endsWith(".xlsx")) {
+    const { workbookDataText, xlsxToWorkbook } = await import("./office");
+    const data = await xlsxToWorkbook(await file.arrayBuffer(), file.name);
+    const full = workbookDataText(data, 2_000_000);
+    const cap = 300_000;
+    return full.length > cap
+      ? { text: full.slice(0, cap), complete: false, note: `first ${cap / 1000}k characters of the workbook` }
+      : { text: full, complete: true, note: null };
+  }
+  return { text: await extractText(file, maxPages), complete: true, note: null };
+}
+
 /** OCR a scanned/image-only PDF in the browser (no AI, no tokens). Renders each page and reads it with Tesseract. */
 export async function ocrPdf(
   data: Blob,

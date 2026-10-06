@@ -4,8 +4,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { workbookDataText, workbookToXlsx, xlsxToWorkbook, type WorkbookData } from "@/lib/office";
 import { logClientError } from "@/lib/error-log";
 import { parseCellAssignments } from "@/lib/office-proposals";
-import { applySheetOps, type SheetEngine } from "@/lib/office-apply";
-import { LIMITS, numToCol, type SheetOp, type WorkbookSnap } from "@/lib/office-tools";
+import {
+  applySheetOps,
+  type CellState,
+  type CellStyle,
+  type SheetEngine,
+} from "@/lib/office-apply";
+import {
+  LIMITS,
+  numToCol,
+  sheetOpHasStyle,
+  type SheetOp,
+  type WorkbookSnap,
+} from "@/lib/office-tools";
+import type { FUniver } from "@univerjs/core/facade";
+import type { FRange, FWorkbook } from "@univerjs/sheets/facade";
 
 /** Values + formulas per sheet for the assistant's read_cells tool (bounded). */
 export function workbookSnapshot(
@@ -32,9 +45,24 @@ export function workbookSnapshot(
   return { ...(active ? { active } : {}), ...(selection ? { selection } : {}), sheets };
 }
 
-/** Legacy "A1 = value" lines → typed ops pinned to a sheet. Leading-zero and non-plain values stay text. */
-export function assignmentsToOps(text: string, defaultSheet: string): SheetOp[] {
-  return parseCellAssignments(text).map((a) => {
+/**
+ * Legacy "A1 = value" fence → typed ops pinned to `askSheet` (the sheet active when the attorney
+ * asked, never the one active at Apply). Strict: every non-empty line must be an assignment, or the
+ * whole fence is rejected — explanations are never silently skipped or written into cells.
+ */
+export function assignmentsToOps(
+  text: string,
+  askSheet: string,
+): { ops: SheetOp[]; errors: string[] } {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const errors: string[] = [];
+  const ops: SheetOp[] = [];
+  for (const [i, line] of lines.entries()) {
+    const a = parseCellAssignments(line)[0];
+    if (!a) {
+      errors.push(`Line ${i + 1} isn't a cell assignment: “${line.trim().slice(0, 60)}”`);
+      continue;
+    }
     const v = a.value;
     const type: SheetOp["type"] = v.startsWith("=")
       ? "formula"
@@ -45,8 +73,10 @@ export function assignmentsToOps(text: string, defaultSheet: string): SheetOp[] 
           : /^-?(0|[1-9]\d*)(\.\d+)?$/.test(v)
             ? "number"
             : "text";
-    return { sheet: a.sheet ?? defaultSheet, cell: a.cell, type, value: type === "clear" ? "" : v };
-  });
+    ops.push({ sheet: a.sheet ?? askSheet, cell: a.cell, type, value: type === "clear" ? "" : v });
+  }
+  if (!lines.length) errors.push("No cell assignments to apply (expected lines like B12 = =SUM(B2:B11)).");
+  return { ops: errors.length ? [] : ops, errors };
 }
 
 type Props = {
@@ -58,70 +88,97 @@ type Props = {
   handle: Ref<EditorHandle | null>;
 };
 
-type FRange = {
-  getValues: () => unknown[][];
-  setValue: (v: string | number | boolean | null) => unknown;
-  getValue?: () => unknown;
-  getFormula?: () => string;
-  setFormula: (f: string) => unknown;
-  getA1Notation: (withSheet?: boolean) => string;
-  isBlank?: () => boolean;
-  getNumberFormat?: () => string;
-  setNumberFormat?: (pattern: string) => unknown;
-};
-type FSheet = {
-  getSheetName: () => string;
-  getRange: (a1: string) => FRange;
-  getSelection: () => { getActiveRange: () => FRange | null } | null;
-};
-type Api = {
-  getActiveWorkbook: () => {
-    save: () => WorkbookData;
-    getActiveSheet: () => FSheet;
-    getSheetByName: (name: string) => FSheet | null;
-    getSheets?: () => FSheet[];
-  } | null;
-  createWorkbook: (d: WorkbookData) => unknown;
-  addEvent?: (ev: unknown, cb: (e: unknown) => void) => { dispose: () => void };
-  Event?: Record<string, unknown>;
+type Api = Pick<FUniver, "getActiveWorkbook" | "createWorkbook"> & {
   onCommandExecuted?: (cb: (c: { id: string; type?: number }) => void) => { dispose: () => void };
-  dispose?: () => void;
 };
+type Wb = FWorkbook;
+type StyleData = NonNullable<ReturnType<FRange["getCellStyleData"]>>;
+type CellData = NonNullable<ReturnType<FRange["getCellData"]>>;
+const CELL_STRING = 1;
+/** Univer's saved snapshot in the shape our ExcelJS bridge reads. */
+const snapshotOf = (wb: Wb) => wb.save() as unknown as WorkbookData;
+const CELL_NUMBER = 2;
+const CELL_BOOLEAN = 3;
+const CELL_FORCE_STRING = 4;
+const ALIGN = { left: 1, center: 2, right: 3 } as const;
 
-type Wb = NonNullable<ReturnType<Api["getActiveWorkbook"]>>;
-function engine(wb: Wb): SheetEngine {
-  const names = () => {
-    const all = wb.getSheets?.();
-    return all ? all.map((s) => s.getSheetName()) : [wb.getActiveSheet().getSheetName()];
+function hexOf(rgb: string | null | undefined) {
+  if (!rgb) return null;
+  const m = /^#?([0-9a-f]{6})$/i.exec(rgb.trim());
+  return m ? `#${m[1]!.toLowerCase()}` : rgb;
+}
+function styleOf(st: StyleData | null): CellStyle {
+  const ht = st?.ht;
+  return {
+    numberFormat: st?.n?.pattern ?? null,
+    bold: st?.bl === 1,
+    fill: hexOf(st?.bg?.rgb ?? null),
+    align: ht === 1 ? "left" : ht === 2 ? "center" : ht === 3 ? "right" : null,
   };
+}
+
+/** Univer facade adapter: explicit cell types (text is FORCE_STRING so "=x", "+1", "00123" stay literal). */
+export function sheetEngine(wb: Wb): SheetEngine {
   const range = (sheet: string, cell: string) => {
     const sh = wb.getSheetByName(sheet);
     if (!sh) throw new Error(`No sheet named "${sheet}".`);
     return sh.getRange(cell);
   };
+  const read = (sheet: string, cell: string): CellState => {
+    const r = range(sheet, cell);
+    const raw = r.getCellData();
+    const f = raw?.f || r.getFormula() || "";
+    const v = raw?.v ?? null;
+    return {
+      v: typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : null,
+      f: f || null,
+      style: styleOf(r.getCellStyleData()),
+      raw: raw ? JSON.parse(JSON.stringify(raw)) : null,
+    };
+  };
   return {
-    sheetNames: names,
+    sheetNames: () => wb.getSheets().map((s) => s.getSheetName()),
+    read,
     write: (sheet, cell, op) => {
       const r = range(sheet, cell);
-      if (op.kind === "formula") r.setFormula(op.formula);
-      // Literal text that looks numeric (e.g. 00123) is written as a string cell so Univer can't coerce it.
-      else if (
-        typeof op.value === "string" &&
-        /^[-+]?[\d.,]+(e[+-]?\d+)?%?$/i.test(op.value.trim())
-      )
-        r.setValue({ v: op.value, t: 1 } as never);
-      else r.setValue(op.value);
+      const style: StyleData = { ...(r.getCellStyleData() ?? {}) };
+      if (op.bold != null) style.bl = op.bold ? 1 : 0;
+      if (op.fill != null) style.bg = { rgb: op.fill };
+      if (op.align != null) style.ht = ALIGN[op.align];
+      if (op.numberFormat != null) style.n = { pattern: op.numberFormat };
+      const styled = sheetOpHasStyle(op);
+      let next: CellData | null;
+      switch (op.type) {
+        case "formula":
+          next = { f: op.value, s: style };
+          break;
+        case "text":
+          next = { v: op.value, t: CELL_FORCE_STRING, f: null, si: null, s: style };
+          break;
+        case "number":
+          next = { v: Number(op.value), t: CELL_NUMBER, f: null, si: null, s: style };
+          break;
+        case "boolean":
+          next = { v: /^true$/i.test(op.value), t: CELL_BOOLEAN, f: null, si: null, s: style };
+          break;
+        case "keep":
+          next = { ...(r.getCellData() ?? {}), s: style };
+          break;
+        case "clear":
+          r.clear({ contentsOnly: true });
+          next = styled ? { s: style } : null;
+          break;
+      }
+      if (next) r.setValue(next);
     },
-    read: (sheet, cell) => {
+    restore: (sheet, cell, prev) => {
       const r = range(sheet, cell);
-      const f = r.getFormula?.() ?? "";
-      return {
-        value: r.getValue ? r.getValue() : (r.getValues()[0]?.[0] ?? null),
-        formula: f || null,
-      };
+      r.clear();
+      if (prev.raw) r.setValue(JSON.parse(JSON.stringify(prev.raw)) as CellData);
     },
   };
 }
+export { CELL_STRING };
 
 /** Spreadsheet editor on Univer (formulas, formatting, freeze, merges). Round-trips .xlsx through ExcelJS. */
 export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: Props) {
@@ -151,8 +208,9 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
           presets: [UniverSheetsCorePreset({ container: hostRef.current })],
         });
         univer = made.univer;
-        const api = made.univerAPI as unknown as Api;
-        api.createWorkbook(data);
+        const api: Api = made.univerAPI;
+        // Our ExcelJS-derived data uses Univer's documented snapshot shape; locale is a plain string here.
+        api.createWorkbook(data as unknown as Parameters<Api["createWorkbook"]>[0]);
         apiRef.current = api;
         // Mutations (type 2) are real edits; operations are selection/scroll.
         let settled = false;
@@ -189,7 +247,7 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
     () => ({
       getText: async () => {
         const wb = apiRef.current?.getActiveWorkbook();
-        return wb ? workbookDataText(wb.save()) : "";
+        return wb ? workbookDataText(snapshotOf(wb)) : "";
       },
       getSelection: async () => {
         try {
@@ -199,7 +257,7 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
           // A single selected cell is a real target too — include it.
           const v = r.getValues() ?? [];
           const grid = v
-            .map((row) => row.map((c) => (c == null ? "" : String(c))).join("\t"))
+            .map((row: unknown[]) => row.map((c) => (c == null ? "" : String(c))).join("\t"))
             .join("\n");
           const f = v.length === 1 && v[0]?.length === 1 ? r.getFormula?.() : "";
           return `Selected ${r.getA1Notation()} on sheet "${sheet.getSheetName()}":\n${grid}${f ? `\nFormula: ${f}` : ""}`;
@@ -218,20 +276,24 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
         } catch {
           /* no selection */
         }
-        return workbookSnapshot(wb.save(), sheet.getSheetName(), selection);
+        return workbookSnapshot(snapshotOf(wb), sheet.getSheetName(), selection);
       },
-      insert: async (text) => {
+      insert: async (text, _how, _anchor, askSheet) => {
         const wb = apiRef.current?.getActiveWorkbook();
         if (!wb) return { ok: false, reason: "The spreadsheet isn't open yet." };
-        const ops = assignmentsToOps(text, wb.getActiveSheet().getSheetName());
-        // Free text is never written into a cell; only explicit cell assignments are applied.
-        if (!ops.length)
+        if (!askSheet)
           return {
             ok: false,
-            reason: "No cell assignments to apply (expected lines like B12 = =SUM(B2:B11)).",
+            reason: "This answer didn't record which sheet was active when you asked. Ask again.",
           };
-        const r = applySheetOps(engine(wb), ops);
-        if (!r.ok) return { ok: false, reason: r.reason };
+        // Free text is never written into a cell; the whole fence must be cell assignments.
+        const { ops, errors } = assignmentsToOps(text, askSheet);
+        if (errors.length) return { ok: false, reason: `Nothing was changed: ${errors.slice(0, 3).join(" ")}` };
+        const r = applySheetOps(sheetEngine(wb), ops);
+        if (!r.ok) {
+          if (r.partial) onDirty();
+          return { ok: false, reason: r.reason };
+        }
         onDirty();
         return { ok: true, tracked: false, how: "cells", detail: r.detail };
       },
@@ -241,8 +303,8 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
         if (p.kind !== "sheet")
           return { ok: false, reason: "That proposal is for a Word document.", applied: 0 };
         try {
-          const r = applySheetOps(engine(wb), p.ops);
-          if (r.applied) onDirty();
+          const r = applySheetOps(sheetEngine(wb), p.ops);
+          if (r.ok || r.partial) onDirty();
           return r;
         } catch (e) {
           logClientError(e, "office", { kind: "xlsx", stage: "apply-proposal" });
@@ -256,7 +318,7 @@ export function SheetEditor({ blob, name, onDirty, onReady, onError, handle }: P
       export: async () => {
         const wb = apiRef.current?.getActiveWorkbook();
         if (!wb) throw new Error("The spreadsheet isn't ready yet.");
-        return workbookToXlsx(wb.save());
+        return workbookToXlsx(snapshotOf(wb));
       },
     }),
     [onDirty],
