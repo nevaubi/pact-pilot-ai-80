@@ -1,10 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Download, Save, History, PanelRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { tryAction } from "@/lib/mutate";
+import { logBoundaryError, logClientError } from "@/lib/error-log";
 import { downloadBlob, officeKind, KIND_LABEL, saveBlobLocally, saveNewVersion, restoreVersion } from "@/lib/office";
 import type { DocMode, EditorHandle } from "@/components/office/DocxEditor";
 import type { DocContext } from "@/hooks/use-assist";
@@ -28,7 +29,40 @@ export const Route = createFileRoute("/_authenticated/office/$fileId")({
     ],
   }),
   component: OfficePage,
+  errorComponent: OfficeError,
 });
+
+/** An editor crash must not take the whole app down: log it, explain, and offer a way back. */
+function OfficeError({ error, reset }: { error: Error; reset: () => void }) {
+  const router = useRouter();
+  const { fileId } = Route.useParams();
+  useEffect(() => {
+    logBoundaryError(error, "office", { fileId });
+  }, [error, fileId]);
+  return (
+    <div className="mx-auto max-w-lg p-6 text-sm">
+      <p className="font-display text-base font-semibold">The editor hit a problem</p>
+      <p className="mt-1 text-muted-foreground">
+        The document itself is safe — your last saved version is unchanged. This has been added to the error log under Settings.
+      </p>
+      <p className="mt-2 rounded border bg-raised px-2 py-1 font-mono text-xs text-muted-foreground">{error.message}</p>
+      <div className="mt-4 flex gap-2">
+        <Button
+          size="sm"
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
+        >
+          Reopen the document
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link to="/files">Back to files</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function OfficePage() {
   const { fileId } = Route.useParams();
