@@ -30,6 +30,7 @@ function fakeSupabase(
       const q: Record<string, unknown> = {
         select: () => q,
         eq: (k: string, v: string) => (filters.push([k, v]), q),
+        abortSignal: (sig: AbortSignal) => ((q["signal"] = sig), q),
         order: () => q,
         limit: async () => ({
           data: rows.filter((r) =>
@@ -77,10 +78,20 @@ describe("matter file guard", () => {
 });
 
 describe("deadlines", () => {
-  it("per-tool deadline rejects slow work", async () => {
-    await expect(withDeadline(new Promise((r) => setTimeout(r, 200)), 20)).rejects.toThrow(
-      /timed out/,
-    );
+  it("per-tool deadline rejects slow work AND aborts the signal handed downstream", async () => {
+    let seen: AbortSignal | undefined;
+    await expect(
+      withDeadline((sig) => ((seen = sig), new Promise((r) => setTimeout(r, 200))), 20),
+    ).rejects.toThrow(/timed out/);
+    expect(seen?.aborted).toBe(true);
+  });
+  it("request abort propagates into the tool's signal", async () => {
+    const parent = new AbortController();
+    let seen: AbortSignal | undefined;
+    const p = withDeadline((sig) => ((seen = sig), new Promise((r) => setTimeout(r, 500))), 5000, parent.signal);
+    parent.abort();
+    await expect(p).rejects.toThrow(/Stopped/);
+    expect(seen?.aborted).toBe(true);
   });
 });
 
@@ -118,6 +129,7 @@ function setup(model: MockLanguageModelV4, effort: "normal" | "advanced" = "norm
     text: "Seller shall deliver audited financial statements within ten (10) business days.",
   };
   const proposals: unknown[] = [];
+  const stepRef = { n: 0 };
   const tools = buildOfficeTools({
     supabase: fakeSupabase(rows),
     matterId: MATTER,
@@ -127,7 +139,10 @@ function setup(model: MockLanguageModelV4, effort: "normal" | "advanced" = "norm
     ],
     budget: new ToolBudget(40_000),
     signal: new AbortController().signal,
+    effort,
+    step: () => stepRef.n,
     publicSearch: async () => [],
+    publicFetch: async () => ({ error: "not used" }),
     onProposal: (p, v) => proposals.push({ p, v }),
   });
   const dp = docPrompt(doc, "tighten", 16_000);
@@ -140,6 +155,7 @@ function setup(model: MockLanguageModelV4, effort: "normal" | "advanced" = "norm
     tools,
     effort,
     signal: new AbortController().signal,
+    onStep: (n) => (stepRef.n = n),
   });
   return { result, proposals, system, malicious };
 }
@@ -160,7 +176,7 @@ describe("office tool loop", () => {
               summary: "Shorten period",
               edits: [
                 {
-                  op: "replace",
+                  op: "replace" as const,
                   find: "ten (10) business days",
                   replace: "five (5) business days",
                 },
@@ -210,5 +226,26 @@ describe("office tool loop", () => {
     for await (const _ of result.fullStream) void _;
     expect(model.doStreamCalls.length).toBe(1);
     expect(model.doStreamCalls[0]!.toolChoice ?? { type: "auto" }).toEqual({ type: "auto" });
+  });
+
+  it("forces a written answer in the last round and sends a real output-token cap", async () => {
+    const many = () => Array.from({ length: 6 }, () => toolStep([{ name: "get_outline", input: {} }]));
+    const model = new MockLanguageModelV4({ doStream: [...many().slice(0, 3), textStep("Final.")] as never });
+    const { result } = setup(model, "normal");
+    let text = "";
+    for await (const p of result.fullStream) if (p.type === "text-delta") text += p.text;
+    expect(model.doStreamCalls.length).toBe(4);
+    expect(model.doStreamCalls[3]!.toolChoice).toEqual({ type: "none" });
+    expect(model.doStreamCalls[0]!.maxOutputTokens).toBe(6000);
+    expect(text).toBe("Final.");
+  });
+
+  it("caps parallel tool calls per round", async () => {
+    const calls = Array.from({ length: 7 }, () => ({ name: "get_outline", input: {} }));
+    const model = new MockLanguageModelV4({ doStream: [toolStep(calls), textStep("ok")] as never });
+    const { result } = setup(model, "normal");
+    const outs: string[] = [];
+    for await (const p of result.fullStream) if (p.type === "tool-result") outs.push(String(p.output));
+    expect(outs.filter((o) => o.includes("per round")).length).toBe(3);
   });
 });
