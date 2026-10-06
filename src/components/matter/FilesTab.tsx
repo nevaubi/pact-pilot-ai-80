@@ -1,3 +1,4 @@
+import { NewDocumentStrip } from "@/components/NewDocumentStrip";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -153,6 +154,7 @@ export function FilesTab({ matterId }: { matterId: string }) {
 
   return (
     <div className="space-y-4">
+      <NewDocumentStrip matterId={matterId} />
       <label
         onDragOver={(e) => {
           e.preventDefault();
